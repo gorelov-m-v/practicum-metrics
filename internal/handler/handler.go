@@ -48,6 +48,10 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid gauge value", http.StatusBadRequest)
 			return
 		}
+		if value < 0 {
+			http.Error(w, "Gauge value cannot be negative", http.StatusBadRequest)
+			return
+		}
 		h.storage.UpdateGauge(metricName, value)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
@@ -56,6 +60,10 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		value, err := strconv.ParseInt(metricValue, 10, 64)
 		if err != nil {
 			http.Error(w, "Invalid counter value", http.StatusBadRequest)
+			return
+		}
+		if value < 0 {
+			http.Error(w, "Counter value cannot be negative", http.StatusBadRequest)
 			return
 		}
 		h.storage.UpdateCounter(metricName, value)

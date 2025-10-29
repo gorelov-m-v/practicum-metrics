@@ -1,7 +1,5 @@
 package storage
 
-import "sync"
-
 type MetricType string
 
 const (
@@ -12,10 +10,11 @@ const (
 type Storage interface {
 	UpdateGauge(name string, value float64)
 	UpdateCounter(name string, value int64)
+	GetGauge(name string) (float64, bool)
+	GetCounter(name string) (int64, bool)
 }
 
 type MemStorage struct {
-	mu       sync.RWMutex
 	gauges   map[string]float64
 	counters map[string]int64
 }
@@ -28,13 +27,19 @@ func NewMemStorage() *MemStorage {
 }
 
 func (s *MemStorage) UpdateGauge(name string, value float64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.gauges[name] = value
 }
 
 func (s *MemStorage) UpdateCounter(name string, value int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.counters[name] += value
+}
+
+func (s *MemStorage) GetGauge(name string) (float64, bool) {
+	value, exists := s.gauges[name]
+	return value, exists
+}
+
+func (s *MemStorage) GetCounter(name string) (int64, bool) {
+	value, exists := s.counters[name]
+	return value, exists
 }
