@@ -9,6 +9,8 @@ import (
 )
 
 func main() {
+	parseFlags()
+
 	store := storage.NewMemStorage()
 	h := handler.NewMetricHandler(store)
 
@@ -18,7 +20,7 @@ func main() {
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
 
-	if err := http.ListenAndServe(":8080", r); err != nil {
+	if err := http.ListenAndServe(flagRunAddr, r); err != nil {
 		panic(err)
 	}
 }

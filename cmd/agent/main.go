@@ -7,13 +7,13 @@ import (
 	"github.com/user/practicum-metrics/internal/agent"
 )
 
-const (
-	pollInterval   = 2 * time.Second
-	reportInterval = 10 * time.Second
-	serverAddress  = "http://localhost:8080"
-)
-
 func main() {
+	parseFlags()
+
+	pollInterval := time.Duration(flagPollInterval) * time.Second
+	reportInterval := time.Duration(flagReportInterval) * time.Second
+	serverAddress := "http://" + flagRunAddr
+
 	collector := agent.NewMetricsCollector()
 	sender := agent.NewMetricsSender(serverAddress)
 
