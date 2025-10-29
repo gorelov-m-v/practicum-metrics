@@ -7,17 +7,28 @@ import (
 )
 
 func TestNewMetricsSender(t *testing.T) {
-	sender := NewMetricsSender("http://localhost:8080")
-	if sender == nil {
-		t.Fatal("NewMetricsSender returned nil")
+	tests := []struct {
+		name          string
+		serverAddress string
+	}{
+		{"create new sender", "http://localhost:8080"},
 	}
 
-	if sender.serverAddress != "http://localhost:8080" {
-		t.Errorf("expected serverAddress to be 'http://localhost:8080', got '%s'", sender.serverAddress)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sender := NewMetricsSender(tt.serverAddress)
+			if sender == nil {
+				t.Fatal("NewMetricsSender returned nil")
+			}
 
-	if sender.client == nil {
-		t.Error("HTTP client not initialized")
+			if sender.serverAddress != tt.serverAddress {
+				t.Errorf("expected serverAddress to be '%s', got '%s'", tt.serverAddress, sender.serverAddress)
+			}
+
+			if sender.client == nil {
+				t.Error("resty client not initialized")
+			}
+		})
 	}
 }
 

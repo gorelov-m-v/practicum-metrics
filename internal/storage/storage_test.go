@@ -213,6 +213,80 @@ func TestMultipleMetrics(t *testing.T) {
 	}
 }
 
+func TestGetAllGauges(t *testing.T) {
+	tests := []struct {
+		name     string
+		gauges   map[string]float64
+		expected int
+	}{
+		{"empty storage", map[string]float64{}, 0},
+		{"single gauge", map[string]float64{"Alloc": 123.456}, 1},
+		{"multiple gauges", map[string]float64{"Alloc": 100.0, "HeapAlloc": 200.0, "Sys": 300.0}, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := NewMemStorage()
+
+			for name, value := range tt.gauges {
+				storage.UpdateGauge(name, value)
+			}
+
+			result := storage.GetAllGauges()
+
+			if len(result) != tt.expected {
+				t.Errorf("expected %d gauges, got %d", tt.expected, len(result))
+			}
+
+			for name, expectedValue := range tt.gauges {
+				value, exists := result[name]
+				if !exists {
+					t.Errorf("gauge %s not found in result", name)
+				} else if value != expectedValue {
+					t.Errorf("gauge %s: expected %f, got %f", name, expectedValue, value)
+				}
+			}
+		})
+	}
+}
+
+func TestGetAllCounters(t *testing.T) {
+	tests := []struct {
+		name     string
+		counters map[string]int64
+		expected int
+	}{
+		{"empty storage", map[string]int64{}, 0},
+		{"single counter", map[string]int64{"PollCount": 5}, 1},
+		{"multiple counters", map[string]int64{"PollCount": 10, "Requests": 20, "Errors": 3}, 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := NewMemStorage()
+
+			for name, value := range tt.counters {
+				storage.UpdateCounter(name, value)
+			}
+
+			result := storage.GetAllCounters()
+
+			if len(result) != tt.expected {
+				t.Errorf("expected %d counters, got %d", tt.expected, len(result))
+			}
+
+			for name, expectedValue := range tt.counters {
+				value, exists := result[name]
+				if !exists {
+					t.Errorf("counter %s not found in result", name)
+				} else if value != expectedValue {
+					t.Errorf("counter %s: expected %d, got %d", name, expectedValue, value)
+				}
+			}
+		})
+	}
+}
+
 func TestStorageInterface(t *testing.T) {
 	var _ Storage = (*MemStorage)(nil)
 }

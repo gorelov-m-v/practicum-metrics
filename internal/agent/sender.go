@@ -4,49 +4,44 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type MetricsSender struct {
 	serverAddress string
-	client        *http.Client
+	client        *resty.Client
 }
 
 func NewMetricsSender(serverAddress string) *MetricsSender {
 	return &MetricsSender{
 		serverAddress: serverAddress,
-		client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
+		client: resty.New().
+			SetTimeout(5*time.Second).
+			SetHeader("Content-Type", "text/plain"),
 	}
 }
 
 func (ms *MetricsSender) SendGauge(name string, value float64) error {
 	url := fmt.Sprintf("%s/update/gauge/%s/%v", ms.serverAddress, name, value)
-	return ms.doRequest(url)
+	resp, err := ms.client.R().Post(url)
+	if err != nil {
+		return fmt.Errorf("failed to send metric: %w", err)
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+	}
+	return nil
 }
 
 func (ms *MetricsSender) SendCounter(name string, value int64) error {
 	url := fmt.Sprintf("%s/update/counter/%s/%d", ms.serverAddress, name, value)
-	return ms.doRequest(url)
-}
-
-func (ms *MetricsSender) doRequest(url string) error {
-	req, err := http.NewRequest(http.MethodPost, url, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "text/plain")
-
-	resp, err := ms.client.Do(req)
+	resp, err := ms.client.R().Post(url)
 	if err != nil {
 		return fmt.Errorf("failed to send metric: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
 	}
-
 	return nil
 }
