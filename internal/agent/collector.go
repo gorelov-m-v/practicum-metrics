@@ -1,9 +1,8 @@
 package agent
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"runtime"
-	"time"
 )
 
 type MetricsCollector struct {
@@ -16,7 +15,7 @@ type MetricsCollector struct {
 func NewMetricsCollector() *MetricsCollector {
 	return &MetricsCollector{
 		gauges: make(map[string]float64),
-		rand:   rand.New(rand.NewSource(time.Now().UnixNano())),
+		rand:   rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())),
 	}
 }
 

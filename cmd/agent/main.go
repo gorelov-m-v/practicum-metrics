@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/user/practicum-metrics/internal/agent"
@@ -36,12 +36,12 @@ func main() {
 
 			for name, value := range gauges {
 				if err := sender.SendGauge(name, value); err != nil {
-					fmt.Printf("Failed to send gauge %s: %v\n", name, err)
+					log.Printf("Failed to send gauge %s: %v\n", name, err)
 				}
 			}
 
 			if err := sender.SendCounter(agent.MetricPollCount, pollCount); err != nil {
-				fmt.Printf("Failed to send counter %s: %v\n", agent.MetricPollCount, err)
+				log.Printf("Failed to send counter %s: %v\n", agent.MetricPollCount, err)
 			}
 		}
 	}

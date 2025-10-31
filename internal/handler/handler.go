@@ -1,6 +1,7 @@
 package handler
 
 import (
+	_ "embed"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -8,11 +9,15 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
+//go:embed templates/metrics.html
+var metricsTemplate string
+
 type MetricHandler struct {
-	storage storage.Storage
+	service *service.MetricsService
 }
 
 type metricData struct {
@@ -25,42 +30,9 @@ type metricsPageData struct {
 	Metrics []metricData
 }
 
-const htmlTemplate = `<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="UTF-8">
-	<title>Metrics</title>
-	<style>
-		body { font-family: Arial, sans-serif; margin: 20px; }
-		h1 { color: #333; }
-		table { border-collapse: collapse; width: 100%; max-width: 800px; }
-		th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-		th { background-color: #4CAF50; color: white; }
-		tr:nth-child(even) { background-color: #f2f2f2; }
-	</style>
-</head>
-<body>
-	<h1>Metrics</h1>
-	<table>
-		<tr>
-			<th>Type</th>
-			<th>Name</th>
-			<th>Value</th>
-		</tr>
-		{{range .Metrics}}
-		<tr>
-			<td>{{.Type}}</td>
-			<td>{{.Name}}</td>
-			<td>{{.Value}}</td>
-		</tr>
-		{{end}}
-	</table>
-</body>
-</html>`
-
-func NewMetricHandler(s storage.Storage) *MetricHandler {
+func NewMetricHandler(s *service.MetricsService) *MetricHandler {
 	return &MetricHandler{
-		storage: s,
+		service: s,
 	}
 }
 
@@ -76,11 +48,10 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		if value < 0 {
-			http.Error(w, "Gauge value cannot be negative", http.StatusBadRequest)
+		if err := h.service.UpdateGauge(metricName, value); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		h.storage.UpdateGauge(metricName, value)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 
@@ -90,11 +61,10 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid counter value", http.StatusBadRequest)
 			return
 		}
-		if value < 0 {
-			http.Error(w, "Counter value cannot be negative", http.StatusBadRequest)
+		if err := h.service.UpdateCounter(metricName, value); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		h.storage.UpdateCounter(metricName, value)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 
@@ -109,7 +79,7 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 
 	switch storage.MetricType(metricType) {
 	case storage.Gauge:
-		value, exists := h.storage.GetGauge(metricName)
+		value, exists := h.service.GetGauge(metricName)
 		if !exists {
 			http.Error(w, "Metric not found", http.StatusNotFound)
 			return
@@ -119,7 +89,7 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%g", value)
 
 	case storage.Counter:
-		value, exists := h.storage.GetCounter(metricName)
+		value, exists := h.service.GetCounter(metricName)
 		if !exists {
 			http.Error(w, "Metric not found", http.StatusNotFound)
 			return
@@ -134,8 +104,8 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
-	gauges := h.storage.GetAllGauges()
-	counters := h.storage.GetAllCounters()
+	gauges := h.service.GetAllGauges()
+	counters := h.service.GetAllCounters()
 
 	var metrics []metricData
 
@@ -162,7 +132,7 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 		return metrics[i].Name < metrics[j].Name
 	})
 
-	tmpl, err := template.New("metrics").Parse(htmlTemplate)
+	tmpl, err := template.New("metrics").Parse(metricsTemplate)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

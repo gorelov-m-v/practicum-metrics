@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
@@ -29,14 +30,15 @@ func TestNewMetricHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 
 			if handler == nil {
 				t.Fatal("NewMetricHandler returned nil")
 			}
 
-			if handler.storage == nil {
-				t.Error("storage not set in handler")
+			if handler.service == nil {
+				t.Error("service not set in handler")
 			}
 		})
 	}
@@ -89,7 +91,8 @@ func TestUpdateMetric_Gauge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
@@ -168,7 +171,8 @@ func TestUpdateMetric_Counter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
@@ -214,7 +218,8 @@ func TestUpdateMetric_InvalidType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 
 			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
 			w := httptest.NewRecorder()
@@ -244,7 +249,8 @@ func TestUpdateMetric_ContentType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
@@ -278,7 +284,8 @@ func TestUpdateMetric_CounterAccumulation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			for i := 0; i < tt.updates; i++ {
@@ -320,7 +327,8 @@ func TestUpdateMetric_GaugeOverwrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req1 := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/update/gauge/%s/%v", tt.metricName, tt.firstValue), nil)
@@ -364,7 +372,8 @@ func TestGetMetric_Gauge(t *testing.T) {
 				store.UpdateGauge(tt.metricName, tt.metricValue)
 			}
 
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/value/gauge/%s", tt.metricName), nil)
@@ -406,7 +415,8 @@ func TestGetMetric_Counter(t *testing.T) {
 				store.UpdateCounter(tt.metricName, tt.metricValue)
 			}
 
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/value/counter/%s", tt.metricName), nil)
@@ -441,7 +451,8 @@ func TestGetMetric_InvalidType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/value/%s/%s", tt.metricType, tt.metricName), nil)
@@ -506,7 +517,8 @@ func TestListMetrics(t *testing.T) {
 				store.UpdateCounter(name, value)
 			}
 
-			handler := NewMetricHandler(store)
+			metricsService := service.NewMetricsService(store)
+			handler := NewMetricHandler(metricsService)
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
