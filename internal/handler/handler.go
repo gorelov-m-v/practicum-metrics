@@ -13,7 +13,7 @@ import (
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
-//go:embed templates/metrics.html
+//go:embed all:templates/metrics.html
 var metricsTemplate string
 
 type MetricHandler struct {
