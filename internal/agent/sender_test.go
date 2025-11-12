@@ -57,6 +57,14 @@ func TestSendGauge(t *testing.T) {
 			expectedPath:   "/update/gauge/TestMetric/0",
 			wantError:      false,
 		},
+		{
+			name:           "server returns non-200 status",
+			metricName:     "FailMetric",
+			metricValue:    100.0,
+			expectedStatus: http.StatusInternalServerError,
+			expectedPath:   "/update/gauge/FailMetric/100",
+			wantError:      true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -117,6 +125,14 @@ func TestSendCounter(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			expectedPath:   "/update/counter/TestCounter/0",
 			wantError:      false,
+		},
+		{
+			name:           "server returns non-200 status",
+			metricName:     "FailCounter",
+			metricValue:    50,
+			expectedStatus: http.StatusBadRequest,
+			expectedPath:   "/update/counter/FailCounter/50",
+			wantError:      true,
 		},
 	}
 

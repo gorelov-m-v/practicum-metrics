@@ -11,18 +11,28 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/user/practicum-metrics/internal/handler"
+	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
+	"go.uber.org/zap"
 )
 
 func main() {
 	parseFlags()
+
+	logger, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Sync()
 
 	store := storage.NewMemStorage()
 	metricsService := service.NewMetricsService(store)
 	h := handler.NewMetricHandler(metricsService)
 
 	r := chi.NewRouter()
+
+	r.Use(middleware.Logging(logger))
 
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
