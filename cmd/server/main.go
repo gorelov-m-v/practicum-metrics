@@ -34,10 +34,12 @@ func main() {
 
 	r.Use(middleware.Logging(logger))
 
-	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	r.Post("/update/", h.UpdateMetricJSON)
 	r.Post("/update", h.UpdateMetricJSON)
-	r.Get("/value/{type}/{name}", h.GetMetric)
+	r.Post("/value/", h.GetMetricJSON)
 	r.Post("/value", h.GetMetricJSON)
+	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
 
 	server := &http.Server{
