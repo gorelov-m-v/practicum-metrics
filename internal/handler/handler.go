@@ -2,6 +2,7 @@ package handler
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
 )
@@ -143,6 +145,89 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	data := metricsPageData{Metrics: metrics}
 	if err := tmpl.Execute(w, data); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
+	var req model.Metrics
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	switch storage.MetricType(req.MType) {
+	case storage.Gauge:
+		if req.Value == nil {
+			http.Error(w, "Missing value for gauge", http.StatusBadRequest)
+			return
+		}
+		if err := h.service.UpdateGauge(req.ID, *req.Value); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+	case storage.Counter:
+		if req.Delta == nil {
+			http.Error(w, "Missing delta for counter", http.StatusBadRequest)
+			return
+		}
+		if err := h.service.UpdateCounter(req.ID, *req.Delta); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+	default:
+		http.Error(w, "Invalid metric type", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
+	var req model.Metrics
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	resp := model.Metrics{
+		ID:    req.ID,
+		MType: req.MType,
+	}
+
+	switch storage.MetricType(req.MType) {
+	case storage.Gauge:
+		value, exists := h.service.GetGauge(req.ID)
+		if !exists {
+			http.Error(w, "Metric not found", http.StatusNotFound)
+			return
+		}
+		resp.Value = &value
+
+	case storage.Counter:
+		value, exists := h.service.GetCounter(req.ID)
+		if !exists {
+			http.Error(w, "Metric not found", http.StatusNotFound)
+			return
+		}
+		resp.Delta = &value
+
+	default:
+		http.Error(w, "Invalid metric type", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(resp); err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
 	}
 }

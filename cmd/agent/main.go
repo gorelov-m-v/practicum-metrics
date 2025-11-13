@@ -35,12 +35,12 @@ func main() {
 			pollCount := collector.GetPollCount()
 
 			for name, value := range gauges {
-				if err := sender.SendGauge(name, value); err != nil {
+				if err := sender.SendGaugeJSON(name, value); err != nil {
 					log.Printf("Failed to send gauge %s: %v\n", name, err)
 				}
 			}
 
-			if err := sender.SendCounter(agent.MetricPollCount, pollCount); err != nil {
+			if err := sender.SendCounterJSON(agent.MetricPollCount, pollCount); err != nil {
 				log.Printf("Failed to send counter %s: %v\n", agent.MetricPollCount, err)
 			}
 		}

@@ -1,12 +1,15 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/user/practicum-metrics/internal/model"
 )
 
 const (
@@ -84,6 +87,104 @@ func (ms *MetricsSender) SendCounter(name string, value int64) error {
 			lastErr = fmt.Errorf("failed to send metric: %w", err)
 		} else {
 			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+		}
+
+		if attempt < maxRetries-1 {
+			time.Sleep(delay)
+			delay += retryBackoff
+		}
+	}
+
+	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+}
+
+func (ms *MetricsSender) SendGaugeJSON(name string, value float64) error {
+	reqURL, err := url.JoinPath(ms.serverAddress, "update")
+	if err != nil {
+		return fmt.Errorf("failed to build URL: %w", err)
+	}
+
+	metric := model.Metrics{
+		ID:    name,
+		MType: "gauge",
+		Value: &value,
+	}
+
+	body, err := json.Marshal(metric)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	var lastErr error
+	delay := retryDelay
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(body))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		} else {
+			lastErr = fmt.Errorf("failed to send metric: %w", err)
+		}
+
+		if attempt < maxRetries-1 {
+			time.Sleep(delay)
+			delay += retryBackoff
+		}
+	}
+
+	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+}
+
+func (ms *MetricsSender) SendCounterJSON(name string, value int64) error {
+	reqURL, err := url.JoinPath(ms.serverAddress, "update")
+	if err != nil {
+		return fmt.Errorf("failed to build URL: %w", err)
+	}
+
+	metric := model.Metrics{
+		ID:    name,
+		MType: "counter",
+		Delta: &value,
+	}
+
+	body, err := json.Marshal(metric)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	var lastErr error
+	delay := retryDelay
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(body))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		} else {
+			lastErr = fmt.Errorf("failed to send metric: %w", err)
 		}
 
 		if attempt < maxRetries-1 {
