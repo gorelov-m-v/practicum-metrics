@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -221,7 +222,18 @@ func TestSendGaugeJSON(t *testing.T) {
 					t.Errorf("expected Content-Type 'application/json', got '%s'", contentType)
 				}
 
-				body, err := io.ReadAll(r.Body)
+				contentEncoding := r.Header.Get("Content-Encoding")
+				if contentEncoding != "gzip" {
+					t.Errorf("expected Content-Encoding 'gzip', got '%s'", contentEncoding)
+				}
+
+				gr, err := gzip.NewReader(r.Body)
+				if err != nil {
+					t.Fatalf("failed to create gzip reader: %v", err)
+				}
+				defer gr.Close()
+
+				body, err := io.ReadAll(gr)
 				if err != nil {
 					t.Fatalf("failed to read body: %v", err)
 				}
@@ -310,7 +322,18 @@ func TestSendCounterJSON(t *testing.T) {
 					t.Errorf("expected Content-Type 'application/json', got '%s'", contentType)
 				}
 
-				body, err := io.ReadAll(r.Body)
+				contentEncoding := r.Header.Get("Content-Encoding")
+				if contentEncoding != "gzip" {
+					t.Errorf("expected Content-Encoding 'gzip', got '%s'", contentEncoding)
+				}
+
+				gr, err := gzip.NewReader(r.Body)
+				if err != nil {
+					t.Fatalf("failed to create gzip reader: %v", err)
+				}
+				defer gr.Close()
+
+				body, err := io.ReadAll(gr)
 				if err != nil {
 					t.Fatalf("failed to read body: %v", err)
 				}

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -115,16 +116,27 @@ func (ms *MetricsSender) SendGaugeJSON(name string, value float64) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(body); err != nil {
+		return fmt.Errorf("failed to compress data: %w", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		return fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
 	var lastErr error
 	delay := retryDelay
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(body))
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept-Encoding", "gzip")
 
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Do(req)
@@ -164,16 +176,27 @@ func (ms *MetricsSender) SendCounterJSON(name string, value int64) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(body); err != nil {
+		return fmt.Errorf("failed to compress data: %w", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		return fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
 	var lastErr error
 	delay := retryDelay
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(body))
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
 
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept-Encoding", "gzip")
 
 		client := &http.Client{Timeout: 5 * time.Second}
 		resp, err := client.Do(req)
