@@ -626,6 +626,25 @@ func TestUpdateMetricJSON_Gauge(t *testing.T) {
 				} else if value != tt.expectedValue {
 					t.Errorf("expected value %f, got %f", tt.expectedValue, value)
 				}
+
+				var resp model.Metrics
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+
+				if resp.ID != tt.requestBody.ID {
+					t.Errorf("expected ID '%s', got '%s'", tt.requestBody.ID, resp.ID)
+				}
+
+				if resp.MType != "gauge" {
+					t.Errorf("expected MType 'gauge', got '%s'", resp.MType)
+				}
+
+				if resp.Value == nil {
+					t.Error("expected Value to be set in response")
+				} else if *resp.Value != tt.expectedValue {
+					t.Errorf("expected Value %f in response, got %f", tt.expectedValue, *resp.Value)
+				}
 			}
 
 			if w.Code == http.StatusOK {
@@ -703,6 +722,25 @@ func TestUpdateMetricJSON_Counter(t *testing.T) {
 					t.Errorf("metric %s was not stored", tt.requestBody.ID)
 				} else if value != tt.expectedValue {
 					t.Errorf("expected value %d, got %d", tt.expectedValue, value)
+				}
+
+				var resp model.Metrics
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+
+				if resp.ID != tt.requestBody.ID {
+					t.Errorf("expected ID '%s', got '%s'", tt.requestBody.ID, resp.ID)
+				}
+
+				if resp.MType != "counter" {
+					t.Errorf("expected MType 'counter', got '%s'", resp.MType)
+				}
+
+				if resp.Delta == nil {
+					t.Error("expected Delta to be set in response")
+				} else if *resp.Delta != tt.expectedValue {
+					t.Errorf("expected Delta %d in response, got %d", tt.expectedValue, *resp.Delta)
 				}
 			}
 		})

@@ -158,6 +158,11 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	resp := model.Metrics{
+		ID:    req.ID,
+		MType: req.MType,
+	}
+
 	switch storage.MetricType(req.MType) {
 	case storage.Gauge:
 		if req.Value == nil {
@@ -168,6 +173,8 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		value, _ := h.service.GetGauge(req.ID)
+		resp.Value = &value
 
 	case storage.Counter:
 		if req.Delta == nil {
@@ -178,6 +185,8 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		delta, _ := h.service.GetCounter(req.ID)
+		resp.Delta = &delta
 
 	default:
 		http.Error(w, "Invalid metric type", http.StatusBadRequest)
@@ -185,7 +194,11 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(resp); err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
