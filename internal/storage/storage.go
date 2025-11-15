@@ -1,6 +1,12 @@
 package storage
 
-import "sync"
+import (
+	"encoding/json"
+	"os"
+	"sync"
+
+	"github.com/user/practicum-metrics/internal/model"
+)
 
 type MetricType string
 
@@ -16,6 +22,8 @@ type Storage interface {
 	GetCounter(name string) (int64, bool)
 	GetAllGauges() map[string]float64
 	GetAllCounters() map[string]int64
+	SaveToFile(filename string) error
+	LoadFromFile(filename string) error
 }
 
 type MemStorage struct {
@@ -75,4 +83,69 @@ func (s *MemStorage) GetAllCounters() map[string]int64 {
 		result[k] = v
 	}
 	return result
+}
+
+func (s *MemStorage) SaveToFile(filename string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var metrics []model.Metrics
+
+	for name, value := range s.gauges {
+		v := value
+		metrics = append(metrics, model.Metrics{
+			ID:    name,
+			MType: string(Gauge),
+			Value: &v,
+		})
+	}
+
+	for name, delta := range s.counters {
+		d := delta
+		metrics = append(metrics, model.Metrics{
+			ID:    name,
+			MType: string(Counter),
+			Delta: &d,
+		})
+	}
+
+	data, err := json.MarshalIndent(metrics, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filename, data, 0644)
+}
+
+func (s *MemStorage) LoadFromFile(filename string) error {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var metrics []model.Metrics
+	if err := json.Unmarshal(data, &metrics); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, m := range metrics {
+		switch MetricType(m.MType) {
+		case Gauge:
+			if m.Value != nil {
+				s.gauges[m.ID] = *m.Value
+			}
+		case Counter:
+			if m.Delta != nil {
+				s.counters[m.ID] = *m.Delta
+			}
+		}
+	}
+
+	return nil
 }

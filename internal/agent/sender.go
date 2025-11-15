@@ -11,36 +11,44 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/user/practicum-metrics/internal/model"
+	"github.com/user/practicum-metrics/internal/storage"
 )
 
 const (
-	maxRetries   = 3
-	retryDelay   = 1 * time.Second
-	retryBackoff = 2 * time.Second
+	maxRetries     = 3
+	retryDelay     = 1 * time.Second
+	retryBackoff   = 2 * time.Second
+	defaultTimeout = 5 * time.Second
 )
 
 type MetricsSender struct {
 	serverAddress string
 	client        HTTPClient
+	httpClient    *http.Client
 }
 
 func NewMetricsSender(serverAddress string) *MetricsSender {
 	restyClient := resty.New().
-		SetTimeout(5*time.Second).
+		SetTimeout(defaultTimeout).
 		SetHeader("Content-Type", "text/plain")
 
-	return NewMetricsSenderWithClient(serverAddress, NewRestyClientAdapter(restyClient))
+	return &MetricsSender{
+		serverAddress: serverAddress,
+		client:        NewRestyClientAdapter(restyClient),
+		httpClient:    &http.Client{Timeout: defaultTimeout},
+	}
 }
 
 func NewMetricsSenderWithClient(serverAddress string, client HTTPClient) *MetricsSender {
 	return &MetricsSender{
 		serverAddress: serverAddress,
 		client:        client,
+		httpClient:    &http.Client{Timeout: defaultTimeout},
 	}
 }
 
-func (ms *MetricsSender) SendGauge(name string, value float64) error {
-	reqURL, err := url.JoinPath(ms.serverAddress, "update", "gauge", url.PathEscape(name), fmt.Sprintf("%v", value))
+func (ms *MetricsSender) sendMetric(metricType, name, value string) error {
+	reqURL, err := url.JoinPath(ms.serverAddress, "update", metricType, url.PathEscape(name), value)
 	if err != nil {
 		return fmt.Errorf("failed to build URL: %w", err)
 	}
@@ -69,25 +77,56 @@ func (ms *MetricsSender) SendGauge(name string, value float64) error {
 	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
 }
 
+func (ms *MetricsSender) SendGauge(name string, value float64) error {
+	return ms.sendMetric(string(storage.Gauge), name, fmt.Sprintf("%v", value))
+}
+
 func (ms *MetricsSender) SendCounter(name string, value int64) error {
-	reqURL, err := url.JoinPath(ms.serverAddress, "update", "counter", url.PathEscape(name), fmt.Sprintf("%d", value))
+	return ms.sendMetric(string(storage.Counter), name, fmt.Sprintf("%d", value))
+}
+
+func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
+	reqURL, err := url.JoinPath(ms.serverAddress, "update")
 	if err != nil {
 		return fmt.Errorf("failed to build URL: %w", err)
+	}
+
+	body, err := json.Marshal(metric)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(body); err != nil {
+		return fmt.Errorf("failed to compress data: %w", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		return fmt.Errorf("failed to close gzip writer: %w", err)
 	}
 
 	var lastErr error
 	delay := retryDelay
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := ms.client.Post(reqURL)
-		if err == nil && resp.StatusCode() == http.StatusOK {
-			return nil
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
 		}
 
-		if err != nil {
-			lastErr = fmt.Errorf("failed to send metric: %w", err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept-Encoding", "gzip")
+
+		resp, err := ms.httpClient.Do(req)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				return nil
+			}
+			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 		} else {
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+			lastErr = fmt.Errorf("failed to send metric: %w", err)
 		}
 
 		if attempt < maxRetries-1 {
@@ -100,121 +139,19 @@ func (ms *MetricsSender) SendCounter(name string, value int64) error {
 }
 
 func (ms *MetricsSender) SendGaugeJSON(name string, value float64) error {
-	reqURL, err := url.JoinPath(ms.serverAddress, "update")
-	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
-	}
-
 	metric := model.Metrics{
 		ID:    name,
-		MType: "gauge",
+		MType: string(storage.Gauge),
 		Value: &value,
 	}
-
-	body, err := json.Marshal(metric)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write(body); err != nil {
-		return fmt.Errorf("failed to compress data: %w", err)
-	}
-	if err := gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close gzip writer: %w", err)
-	}
-
-	var lastErr error
-	delay := retryDelay
-
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-		req.Header.Set("Accept-Encoding", "gzip")
-
-		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Do(req)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				return nil
-			}
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-		} else {
-			lastErr = fmt.Errorf("failed to send metric: %w", err)
-		}
-
-		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
-		}
-	}
-
-	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+	return ms.sendMetricJSON(metric)
 }
 
 func (ms *MetricsSender) SendCounterJSON(name string, value int64) error {
-	reqURL, err := url.JoinPath(ms.serverAddress, "update")
-	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
-	}
-
 	metric := model.Metrics{
 		ID:    name,
-		MType: "counter",
+		MType: string(storage.Counter),
 		Delta: &value,
 	}
-
-	body, err := json.Marshal(metric)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write(body); err != nil {
-		return fmt.Errorf("failed to compress data: %w", err)
-	}
-	if err := gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close gzip writer: %w", err)
-	}
-
-	var lastErr error
-	delay := retryDelay
-
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Content-Encoding", "gzip")
-		req.Header.Set("Accept-Encoding", "gzip")
-
-		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Do(req)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				return nil
-			}
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-		} else {
-			lastErr = fmt.Errorf("failed to send metric: %w", err)
-		}
-
-		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
-		}
-	}
-
-	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+	return ms.sendMetricJSON(metric)
 }

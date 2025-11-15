@@ -374,3 +374,179 @@ func TestSendCounterJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestSendGauge_WithRetries(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		if attemptCount < 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendGauge("TestMetric", 100.0)
+
+	if err != nil {
+		t.Errorf("expected success after retries, got error: %v", err)
+	}
+
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendGauge_AllRetriesFailed(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendGauge("TestMetric", 100.0)
+
+	if err == nil {
+		t.Error("expected error after all retries failed")
+	}
+
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendCounter_WithRetries(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		if attemptCount < 2 {
+			w.WriteHeader(http.StatusBadGateway)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendCounter("TestCounter", 42)
+
+	if err != nil {
+		t.Errorf("expected success after retries, got error: %v", err)
+	}
+
+	if attemptCount != 2 {
+		t.Errorf("expected 2 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendCounter_AllRetriesFailed(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendCounter("TestCounter", 42)
+
+	if err == nil {
+		t.Error("expected error after all retries failed")
+	}
+
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendGaugeJSON_WithRetries(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		if attemptCount < 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendGaugeJSON("TestMetric", 123.456)
+
+	if err != nil {
+		t.Errorf("expected success after retries, got error: %v", err)
+	}
+
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendGaugeJSON_AllRetriesFailed(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendGaugeJSON("TestMetric", 123.456)
+
+	if err == nil {
+		t.Error("expected error after all retries failed")
+	}
+
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendCounterJSON_WithRetries(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		if attemptCount == 1 {
+			w.WriteHeader(http.StatusBadRequest)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendCounterJSON("TestCounter", 999)
+
+	if err != nil {
+		t.Errorf("expected success after retries, got error: %v", err)
+	}
+
+	if attemptCount != 2 {
+		t.Errorf("expected 2 attempts, got %d", attemptCount)
+	}
+}
+
+func TestSendCounterJSON_AllRetriesFailed(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL)
+	err := sender.SendCounterJSON("TestCounter", 999)
+
+	if err == nil {
+		t.Error("expected error after all retries failed")
+	}
+
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
+	}
+}

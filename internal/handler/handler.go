@@ -19,7 +19,8 @@ import (
 var metricsTemplate string
 
 type MetricHandler struct {
-	service *service.MetricsService
+	service  *service.MetricsService
+	template *template.Template
 }
 
 type metricData struct {
@@ -32,10 +33,16 @@ type metricsPageData struct {
 	Metrics []metricData
 }
 
-func NewMetricHandler(s *service.MetricsService) *MetricHandler {
-	return &MetricHandler{
-		service: s,
+func NewMetricHandler(s *service.MetricsService) (*MetricHandler, error) {
+	tmpl, err := template.New("metrics").Parse(metricsTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
 	}
+
+	return &MetricHandler{
+		service:  s,
+		template: tmpl,
+	}, nil
 }
 
 func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +120,7 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 
 	for name, value := range gauges {
 		metrics = append(metrics, metricData{
-			Type:  "gauge",
+			Type:  string(storage.Gauge),
 			Name:  name,
 			Value: fmt.Sprintf("%g", value),
 		})
@@ -121,7 +128,7 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 
 	for name, value := range counters {
 		metrics = append(metrics, metricData{
-			Type:  "counter",
+			Type:  string(storage.Gauge),
 			Name:  name,
 			Value: fmt.Sprintf("%d", value),
 		})
@@ -134,16 +141,10 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 		return metrics[i].Name < metrics[j].Name
 	})
 
-	tmpl, err := template.New("metrics").Parse(metricsTemplate)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	data := metricsPageData{Metrics: metrics}
-	if err := tmpl.Execute(w, data); err != nil {
+	if err := h.template.Execute(w, data); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -194,9 +195,9 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(resp); err != nil {
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
 	}
 }
@@ -238,9 +239,9 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 	if err := enc.Encode(resp); err != nil {
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		return
 	}
 }

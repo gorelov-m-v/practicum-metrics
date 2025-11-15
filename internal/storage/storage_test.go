@@ -1,7 +1,12 @@
 package storage
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/user/practicum-metrics/internal/model"
 )
 
 func TestNewMemStorage(t *testing.T) {
@@ -289,4 +294,275 @@ func TestGetAllCounters(t *testing.T) {
 
 func TestStorageInterface(t *testing.T) {
 	var _ Storage = (*MemStorage)(nil)
+}
+
+func TestSaveToFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		gauges   map[string]float64
+		counters map[string]int64
+	}{
+		{
+			name:     "empty storage",
+			gauges:   map[string]float64{},
+			counters: map[string]int64{},
+		},
+		{
+			name:     "only gauges",
+			gauges:   map[string]float64{"Alloc": 123.456, "HeapAlloc": 789.012},
+			counters: map[string]int64{},
+		},
+		{
+			name:     "only counters",
+			gauges:   map[string]float64{},
+			counters: map[string]int64{"PollCount": 5, "Requests": 10},
+		},
+		{
+			name:     "mixed metrics",
+			gauges:   map[string]float64{"Alloc": 100.0, "Sys": 200.0},
+			counters: map[string]int64{"PollCount": 42, "Errors": 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := NewMemStorage()
+
+			for name, value := range tt.gauges {
+				storage.UpdateGauge(name, value)
+			}
+
+			for name, value := range tt.counters {
+				storage.UpdateCounter(name, value)
+			}
+
+			tmpFile := filepath.Join(t.TempDir(), "metrics.json")
+
+			if err := storage.SaveToFile(tmpFile); err != nil {
+				t.Fatalf("SaveToFile failed: %v", err)
+			}
+
+			data, err := os.ReadFile(tmpFile)
+			if err != nil {
+				t.Fatalf("failed to read saved file: %v", err)
+			}
+
+			var metrics []model.Metrics
+			if err := json.Unmarshal(data, &metrics); err != nil {
+				t.Fatalf("failed to unmarshal JSON: %v", err)
+			}
+
+			gaugeCount := 0
+			counterCount := 0
+
+			for _, m := range metrics {
+				switch m.MType {
+				case "gauge":
+					gaugeCount++
+					expectedValue, exists := tt.gauges[m.ID]
+					if !exists {
+						t.Errorf("unexpected gauge in file: %s", m.ID)
+					} else if m.Value == nil || *m.Value != expectedValue {
+						if m.Value == nil {
+							t.Errorf("gauge %s has nil value", m.ID)
+						} else {
+							t.Errorf("gauge %s: expected %f, got %f", m.ID, expectedValue, *m.Value)
+						}
+					}
+				case "counter":
+					counterCount++
+					expectedDelta, exists := tt.counters[m.ID]
+					if !exists {
+						t.Errorf("unexpected counter in file: %s", m.ID)
+					} else if m.Delta == nil || *m.Delta != expectedDelta {
+						if m.Delta == nil {
+							t.Errorf("counter %s has nil delta", m.ID)
+						} else {
+							t.Errorf("counter %s: expected %d, got %d", m.ID, expectedDelta, *m.Delta)
+						}
+					}
+				}
+			}
+
+			if gaugeCount != len(tt.gauges) {
+				t.Errorf("expected %d gauges in file, got %d", len(tt.gauges), gaugeCount)
+			}
+
+			if counterCount != len(tt.counters) {
+				t.Errorf("expected %d counters in file, got %d", len(tt.counters), counterCount)
+			}
+		})
+	}
+}
+
+func TestLoadFromFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		metrics []model.Metrics
+		wantErr bool
+	}{
+		{
+			name: "valid metrics file",
+			metrics: []model.Metrics{
+				{ID: "Alloc", MType: "gauge", Value: ptrFloat64(123.456)},
+				{ID: "HeapAlloc", MType: "gauge", Value: ptrFloat64(789.012)},
+				{ID: "PollCount", MType: "counter", Delta: ptrInt64(42)},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "empty file",
+			metrics: []model.Metrics{},
+			wantErr: false,
+		},
+		{
+			name: "only gauges",
+			metrics: []model.Metrics{
+				{ID: "Gauge1", MType: "gauge", Value: ptrFloat64(1.0)},
+				{ID: "Gauge2", MType: "gauge", Value: ptrFloat64(2.0)},
+			},
+			wantErr: false,
+		},
+		{
+			name: "only counters",
+			metrics: []model.Metrics{
+				{ID: "Counter1", MType: "counter", Delta: ptrInt64(10)},
+				{ID: "Counter2", MType: "counter", Delta: ptrInt64(20)},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpFile := filepath.Join(t.TempDir(), "metrics.json")
+
+			data, err := json.Marshal(tt.metrics)
+			if err != nil {
+				t.Fatalf("failed to marshal test data: %v", err)
+			}
+
+			if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+				t.Fatalf("failed to write test file: %v", err)
+			}
+
+			storage := NewMemStorage()
+
+			err = storage.LoadFromFile(tmpFile)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LoadFromFile() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			for _, m := range tt.metrics {
+				switch m.MType {
+				case "gauge":
+					if m.Value != nil {
+						value, exists := storage.GetGauge(m.ID)
+						if !exists {
+							t.Errorf("gauge %s not loaded", m.ID)
+						} else if value != *m.Value {
+							t.Errorf("gauge %s: expected %f, got %f", m.ID, *m.Value, value)
+						}
+					}
+				case "counter":
+					if m.Delta != nil {
+						delta, exists := storage.GetCounter(m.ID)
+						if !exists {
+							t.Errorf("counter %s not loaded", m.ID)
+						} else if delta != *m.Delta {
+							t.Errorf("counter %s: expected %d, got %d", m.ID, *m.Delta, delta)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestLoadFromFile_NonExistentFile(t *testing.T) {
+	storage := NewMemStorage()
+	err := storage.LoadFromFile("/nonexistent/path/metrics.json")
+	if err != nil {
+		t.Errorf("LoadFromFile should not error on non-existent file, got: %v", err)
+	}
+}
+
+func TestLoadFromFile_InvalidJSON(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "invalid.json")
+	if err := os.WriteFile(tmpFile, []byte("invalid json {{{"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	storage := NewMemStorage()
+	err := storage.LoadFromFile(tmpFile)
+	if err == nil {
+		t.Error("LoadFromFile should error on invalid JSON")
+	}
+}
+
+func TestSaveAndLoadRoundTrip(t *testing.T) {
+	storage1 := NewMemStorage()
+
+	storage1.UpdateGauge("Alloc", 123.456)
+	storage1.UpdateGauge("HeapAlloc", 789.012)
+	storage1.UpdateGauge("Sys", 333.333)
+	storage1.UpdateCounter("PollCount", 10)
+	storage1.UpdateCounter("PollCount", 32)
+	storage1.UpdateCounter("Requests", 100)
+
+	tmpFile := filepath.Join(t.TempDir(), "metrics.json")
+
+	if err := storage1.SaveToFile(tmpFile); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+
+	storage2 := NewMemStorage()
+	if err := storage2.LoadFromFile(tmpFile); err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+
+	gauges1 := storage1.GetAllGauges()
+	gauges2 := storage2.GetAllGauges()
+
+	if len(gauges1) != len(gauges2) {
+		t.Errorf("gauge count mismatch: expected %d, got %d", len(gauges1), len(gauges2))
+	}
+
+	for name, value1 := range gauges1 {
+		value2, exists := gauges2[name]
+		if !exists {
+			t.Errorf("gauge %s not found after load", name)
+		} else if value1 != value2 {
+			t.Errorf("gauge %s: expected %f, got %f", name, value1, value2)
+		}
+	}
+
+	counters1 := storage1.GetAllCounters()
+	counters2 := storage2.GetAllCounters()
+
+	if len(counters1) != len(counters2) {
+		t.Errorf("counter count mismatch: expected %d, got %d", len(counters1), len(counters2))
+	}
+
+	for name, value1 := range counters1 {
+		value2, exists := counters2[name]
+		if !exists {
+			t.Errorf("counter %s not found after load", name)
+		} else if value1 != value2 {
+			t.Errorf("counter %s: expected %d, got %d", name, value1, value2)
+		}
+	}
+}
+
+func ptrFloat64(v float64) *float64 {
+	return &v
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
 }

@@ -23,7 +23,7 @@ func (w *gzipWriter) WriteHeader(statusCode int) {
 	contentType := w.ResponseWriter.Header().Get("Content-Type")
 	if shouldCompress(contentType) {
 		w.shouldCompress = true
-		gz, err := gzip.NewWriterLevel(w.ResponseWriter, gzip.BestSpeed)
+		gz, err := gzip.NewWriterLevel(w.ResponseWriter, gzip.DefaultCompression)
 		if err == nil {
 			w.Writer = gz
 			w.ResponseWriter.Header().Set("Content-Encoding", "gzip")

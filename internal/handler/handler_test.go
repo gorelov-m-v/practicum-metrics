@@ -18,8 +18,10 @@ import (
 func setupRouter(h *MetricHandler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	r.Post("/update/", h.UpdateMetricJSON)
 	r.Post("/update", h.UpdateMetricJSON)
 	r.Get("/value/{type}/{name}", h.GetMetric)
+	r.Post("/value/", h.GetMetricJSON)
 	r.Post("/value", h.GetMetricJSON)
 	r.Get("/", h.ListMetrics)
 	return r
@@ -36,7 +38,10 @@ func TestNewMetricHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 
 			if handler == nil {
 				t.Fatal("NewMetricHandler returned nil")
@@ -97,7 +102,10 @@ func TestUpdateMetric_Gauge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
@@ -177,7 +185,10 @@ func TestUpdateMetric_Counter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(tt.method, tt.path, nil)
@@ -224,7 +235,10 @@ func TestUpdateMetric_InvalidType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 
 			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
 			w := httptest.NewRecorder()
@@ -255,7 +269,10 @@ func TestUpdateMetric_ContentType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
@@ -290,7 +307,10 @@ func TestUpdateMetric_CounterAccumulation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			for i := 0; i < tt.updates; i++ {
@@ -333,7 +353,10 @@ func TestUpdateMetric_GaugeOverwrite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req1 := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/update/gauge/%s/%v", tt.metricName, tt.firstValue), nil)
@@ -378,7 +401,10 @@ func TestGetMetric_Gauge(t *testing.T) {
 			}
 
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/value/gauge/%s", tt.metricName), nil)
@@ -421,7 +447,10 @@ func TestGetMetric_Counter(t *testing.T) {
 			}
 
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/value/counter/%s", tt.metricName), nil)
@@ -457,7 +486,10 @@ func TestGetMetric_InvalidType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/value/%s/%s", tt.metricType, tt.metricName), nil)
@@ -523,7 +555,10 @@ func TestListMetrics(t *testing.T) {
 			}
 
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -605,7 +640,10 @@ func TestUpdateMetricJSON_Gauge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			body, _ := json.Marshal(tt.requestBody)
@@ -702,7 +740,10 @@ func TestUpdateMetricJSON_Counter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			body, _ := json.Marshal(tt.requestBody)
@@ -769,7 +810,10 @@ func TestUpdateMetricJSON_InvalidJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodPost, "/update", strings.NewReader(tt.requestBody))
@@ -819,7 +863,10 @@ func TestGetMetricJSON_Gauge(t *testing.T) {
 			}
 
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			reqBody := model.Metrics{
@@ -900,7 +947,10 @@ func TestGetMetricJSON_Counter(t *testing.T) {
 			}
 
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			reqBody := model.Metrics{
@@ -964,7 +1014,10 @@ func TestGetMetricJSON_InvalidJSON(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store)
-			handler := NewMetricHandler(metricsService)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
 			router := setupRouter(handler)
 
 			req := httptest.NewRequest(http.MethodPost, "/value", strings.NewReader(tt.requestBody))
@@ -986,4 +1039,204 @@ func ptrFloat64(f float64) *float64 {
 
 func ptrInt64(i int64) *int64 {
 	return &i
+}
+
+func TestUpdateMetricJSON_WithTrailingSlash(t *testing.T) {
+	tests := []struct {
+		name           string
+		path           string
+		requestBody    model.Metrics
+		expectedStatus int
+	}{
+		{
+			name: "POST /update/ with gauge",
+			path: "/update/",
+			requestBody: model.Metrics{
+				ID:    "TestGauge",
+				MType: "gauge",
+				Value: ptrFloat64(100.5),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "POST /update with gauge",
+			path: "/update",
+			requestBody: model.Metrics{
+				ID:    "TestGauge2",
+				MType: "gauge",
+				Value: ptrFloat64(200.5),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "POST /update/ with counter",
+			path: "/update/",
+			requestBody: model.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+				Delta: ptrInt64(42),
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "POST /update with counter",
+			path: "/update",
+			requestBody: model.Metrics{
+				ID:    "TestCounter2",
+				MType: "counter",
+				Delta: ptrInt64(99),
+			},
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := storage.NewMemStorage()
+			metricsService := service.NewMetricsService(store)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
+			router := setupRouter(handler)
+
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewBuffer(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, w.Code)
+			}
+
+			if w.Code == http.StatusOK {
+				var resp model.Metrics
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+
+				if resp.ID != tt.requestBody.ID {
+					t.Errorf("expected ID '%s', got '%s'", tt.requestBody.ID, resp.ID)
+				}
+
+				if resp.MType != tt.requestBody.MType {
+					t.Errorf("expected MType '%s', got '%s'", tt.requestBody.MType, resp.MType)
+				}
+			}
+		})
+	}
+}
+
+func TestGetMetricJSON_WithTrailingSlash(t *testing.T) {
+	tests := []struct {
+		name           string
+		path           string
+		setupMetric    func(*storage.MemStorage)
+		requestBody    model.Metrics
+		expectedStatus int
+		checkValue     bool
+	}{
+		{
+			name: "POST /value/ for gauge",
+			path: "/value/",
+			setupMetric: func(s *storage.MemStorage) {
+				s.UpdateGauge("TestGauge", 123.456)
+			},
+			requestBody: model.Metrics{
+				ID:    "TestGauge",
+				MType: "gauge",
+			},
+			expectedStatus: http.StatusOK,
+			checkValue:     true,
+		},
+		{
+			name: "POST /value for gauge",
+			path: "/value",
+			setupMetric: func(s *storage.MemStorage) {
+				s.UpdateGauge("TestGauge2", 456.789)
+			},
+			requestBody: model.Metrics{
+				ID:    "TestGauge2",
+				MType: "gauge",
+			},
+			expectedStatus: http.StatusOK,
+			checkValue:     true,
+		},
+		{
+			name: "POST /value/ for counter",
+			path: "/value/",
+			setupMetric: func(s *storage.MemStorage) {
+				s.UpdateCounter("TestCounter", 100)
+			},
+			requestBody: model.Metrics{
+				ID:    "TestCounter",
+				MType: "counter",
+			},
+			expectedStatus: http.StatusOK,
+			checkValue:     true,
+		},
+		{
+			name: "POST /value for counter",
+			path: "/value",
+			setupMetric: func(s *storage.MemStorage) {
+				s.UpdateCounter("TestCounter2", 200)
+			},
+			requestBody: model.Metrics{
+				ID:    "TestCounter2",
+				MType: "counter",
+			},
+			expectedStatus: http.StatusOK,
+			checkValue:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := storage.NewMemStorage()
+			tt.setupMetric(store)
+
+			metricsService := service.NewMetricsService(store)
+			handler, err := NewMetricHandler(metricsService)
+			if err != nil {
+				t.Fatalf("NewMetricHandler failed: %v", err)
+			}
+			router := setupRouter(handler)
+
+			body, _ := json.Marshal(tt.requestBody)
+			req := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewBuffer(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, w.Code)
+			}
+
+			if tt.checkValue && w.Code == http.StatusOK {
+				var resp model.Metrics
+				if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+					t.Fatalf("failed to decode response: %v", err)
+				}
+
+				if resp.ID != tt.requestBody.ID {
+					t.Errorf("expected ID '%s', got '%s'", tt.requestBody.ID, resp.ID)
+				}
+
+				if resp.MType != tt.requestBody.MType {
+					t.Errorf("expected MType '%s', got '%s'", tt.requestBody.MType, resp.MType)
+				}
+
+				if tt.requestBody.MType == "gauge" && resp.Value == nil {
+					t.Error("expected Value to be set for gauge metric")
+				}
+
+				if tt.requestBody.MType == "counter" && resp.Delta == nil {
+					t.Error("expected Delta to be set for counter metric")
+				}
+			}
+		})
+	}
 }
