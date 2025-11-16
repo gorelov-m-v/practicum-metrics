@@ -1,11 +1,7 @@
 package storage
 
 import (
-	"encoding/json"
-	"os"
 	"sync"
-
-	"github.com/user/practicum-metrics/internal/model"
 )
 
 type MetricType string
@@ -22,8 +18,8 @@ type Storage interface {
 	GetCounter(name string) (int64, bool)
 	GetAllGauges() map[string]float64
 	GetAllCounters() map[string]int64
-	SaveToFile(filename string) error
-	LoadFromFile(filename string) error
+	SetGauges(gauges map[string]float64)
+	SetCounters(counters map[string]int64)
 }
 
 type MemStorage struct {
@@ -85,67 +81,18 @@ func (s *MemStorage) GetAllCounters() map[string]int64 {
 	return result
 }
 
-func (s *MemStorage) SaveToFile(filename string) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	var metrics []model.Metrics
-
-	for name, value := range s.gauges {
-		v := value
-		metrics = append(metrics, model.Metrics{
-			ID:    name,
-			MType: string(Gauge),
-			Value: &v,
-		})
-	}
-
-	for name, delta := range s.counters {
-		d := delta
-		metrics = append(metrics, model.Metrics{
-			ID:    name,
-			MType: string(Counter),
-			Delta: &d,
-		})
-	}
-
-	data, err := json.MarshalIndent(metrics, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(filename, data, 0644)
-}
-
-func (s *MemStorage) LoadFromFile(filename string) error {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	var metrics []model.Metrics
-	if err := json.Unmarshal(data, &metrics); err != nil {
-		return err
-	}
-
+func (s *MemStorage) SetGauges(gauges map[string]float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	for _, m := range metrics {
-		switch MetricType(m.MType) {
-		case Gauge:
-			if m.Value != nil {
-				s.gauges[m.ID] = *m.Value
-			}
-		case Counter:
-			if m.Delta != nil {
-				s.counters[m.ID] = *m.Delta
-			}
-		}
+	for name, value := range gauges {
+		s.gauges[name] = value
 	}
+}
 
-	return nil
+func (s *MemStorage) SetCounters(counters map[string]int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for name, value := range counters {
+		s.counters[name] = value
+	}
 }

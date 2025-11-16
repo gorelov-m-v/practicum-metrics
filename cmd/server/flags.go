@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"os"
-	"strconv"
+
+	"github.com/user/practicum-metrics/internal/config"
 )
 
 var (
@@ -20,23 +20,8 @@ func parseFlags() {
 	flag.BoolVar(&flagRestore, "r", true, "restore previously saved values on startup")
 	flag.Parse()
 
-	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
-		flagRunAddr = envAddr
-	}
-
-	if envInterval := os.Getenv("STORE_INTERVAL"); envInterval != "" {
-		if interval, err := strconv.Atoi(envInterval); err == nil {
-			flagStoreInterval = interval
-		}
-	}
-
-	if envPath := os.Getenv("FILE_STORAGE_PATH"); envPath != "" {
-		flagFileStoragePath = envPath
-	}
-
-	if envRestore := os.Getenv("RESTORE"); envRestore != "" {
-		if restore, err := strconv.ParseBool(envRestore); err == nil {
-			flagRestore = restore
-		}
-	}
+	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
+	flagStoreInterval = config.GetEnvAsInt("STORE_INTERVAL", flagStoreInterval)
+	flagFileStoragePath = config.GetEnvAsString("FILE_STORAGE_PATH", flagFileStoragePath)
+	flagRestore = config.GetEnvAsBool("RESTORE", flagRestore)
 }

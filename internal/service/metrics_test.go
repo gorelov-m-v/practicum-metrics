@@ -314,24 +314,14 @@ func TestNewMetricsServiceWithPersister(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			logger := zap.NewNop()
-			persister := storage.NewPersister(store, "/tmp/test.json", tt.storeInterval, logger)
-			service := NewMetricsServiceWithPersister(store, persister)
+			service := NewMetricsService(store)
 
 			if service == nil {
-				t.Fatal("NewMetricsServiceWithPersister returned nil")
+				t.Fatal("NewMetricsService returned nil")
 			}
 
 			if service.storage == nil {
 				t.Error("storage not initialized")
-			}
-
-			if service.persister == nil {
-				t.Error("persister not set")
-			}
-
-			if service.persister != persister {
-				t.Error("persister mismatch")
 			}
 		})
 	}
@@ -344,15 +334,20 @@ func TestMetricsService_SaveIfNeeded_WithSyncPersister(t *testing.T) {
 
 	logger := zap.NewNop()
 	persister := storage.NewPersister(store, tmpFile, 0, logger)
-	service := NewMetricsServiceWithPersister(store, persister)
+	service := NewMetricsService(store)
 
 	err := service.UpdateGauge("TestMetric", 123.456)
 	if err != nil {
 		t.Fatalf("UpdateGauge failed: %v", err)
 	}
 
+	// Manually trigger save
+	persister.SaveSync()
+
+	// Load to verify
 	loadedStore := storage.NewMemStorage()
-	if err := loadedStore.LoadFromFile(tmpFile); err != nil {
+	loadPersister := storage.NewPersister(loadedStore, tmpFile, 0, logger)
+	if err := loadPersister.Restore(); err != nil {
 		t.Fatalf("failed to load saved file: %v", err)
 	}
 
@@ -366,12 +361,7 @@ func TestMetricsService_SaveIfNeeded_WithSyncPersister(t *testing.T) {
 
 func TestMetricsService_SaveIfNeeded_WithAsyncPersister(t *testing.T) {
 	store := storage.NewMemStorage()
-	tmpDir := t.TempDir()
-	tmpFile := tmpDir + "/metrics.json"
-
-	logger := zap.NewNop()
-	persister := storage.NewPersister(store, tmpFile, 300, logger)
-	service := NewMetricsServiceWithPersister(store, persister)
+	service := NewMetricsService(store)
 
 	err := service.UpdateCounter("TestCounter", 42)
 	if err != nil {

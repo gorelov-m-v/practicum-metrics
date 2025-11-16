@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"os"
-	"strconv"
+
+	"github.com/user/practicum-metrics/internal/config"
 )
 
 var (
@@ -18,19 +18,7 @@ func parseFlags() {
 	flag.IntVar(&flagPollInterval, "p", 2, "poll interval in seconds")
 	flag.Parse()
 
-	if envAddr := os.Getenv("ADDRESS"); envAddr != "" {
-		flagRunAddr = envAddr
-	}
-
-	if envReport := os.Getenv("REPORT_INTERVAL"); envReport != "" {
-		if val, err := strconv.Atoi(envReport); err == nil {
-			flagReportInterval = val
-		}
-	}
-
-	if envPoll := os.Getenv("POLL_INTERVAL"); envPoll != "" {
-		if val, err := strconv.Atoi(envPoll); err == nil {
-			flagPollInterval = val
-		}
-	}
+	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
+	flagReportInterval = config.GetEnvAsInt("REPORT_INTERVAL", flagReportInterval)
+	flagPollInterval = config.GetEnvAsInt("POLL_INTERVAL", flagPollInterval)
 }

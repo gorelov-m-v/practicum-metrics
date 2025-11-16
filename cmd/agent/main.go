@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,7 +16,7 @@ func main() {
 
 	logger, err := zap.NewProduction()
 	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
+		log.Fatal("Failed to initialize logger: ", err)
 	}
 	defer logger.Sync()
 

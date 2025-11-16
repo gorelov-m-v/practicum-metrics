@@ -29,20 +29,19 @@ func main() {
 
 	store := storage.NewMemStorage()
 
+	persister := storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
+
 	if flagRestore {
-		if err := store.LoadFromFile(flagFileStoragePath); err != nil {
+		if err := persister.Restore(); err != nil {
 			logger.Warn("Failed to restore metrics from file", zap.Error(err))
-		} else {
-			logger.Info("Metrics restored from file")
 		}
 	}
 
-	persister := storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
 	persister.Start()
 	defer persister.Stop()
 
-	metricsService := service.NewMetricsServiceWithPersister(store, persister)
-	h, err := handler.NewMetricHandler(metricsService)
+	metricsService := service.NewMetricsService(store)
+	h, err := handler.NewMetricHandler(metricsService, persister)
 	if err != nil {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}

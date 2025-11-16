@@ -106,7 +106,8 @@ func TestPersister_SaveSync(t *testing.T) {
 			}
 
 			loadedStore := NewMemStorage()
-			if err := loadedStore.LoadFromFile(tmpFile); err != nil {
+			loadPersister := NewPersister(loadedStore, tmpFile, 0, logger)
+			if err := loadPersister.Restore(); err != nil {
 				t.Fatalf("failed to load saved file: %v", err)
 			}
 
@@ -164,7 +165,8 @@ func TestPersister_StartStop_AsyncMode(t *testing.T) {
 	}
 
 	loadedStore := NewMemStorage()
-	if err := loadedStore.LoadFromFile(tmpFile); err != nil {
+	loadPersister := NewPersister(loadedStore, tmpFile, 0, logger)
+	if err := loadPersister.Restore(); err != nil {
 		t.Fatalf("failed to load saved file: %v", err)
 	}
 
@@ -192,7 +194,8 @@ func TestPersister_PeriodicSave_MultipleUpdates(t *testing.T) {
 	time.Sleep(600 * time.Millisecond)
 
 	loadedStore := NewMemStorage()
-	if err := loadedStore.LoadFromFile(tmpFile); err != nil {
+	loadPersister := NewPersister(loadedStore, tmpFile, 0, logger)
+	if err := loadPersister.Restore(); err != nil {
 		t.Fatalf("failed to load saved file: %v", err)
 	}
 

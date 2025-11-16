@@ -19,8 +19,9 @@ import (
 var metricsTemplate string
 
 type MetricHandler struct {
-	service  *service.MetricsService
-	template *template.Template
+	service   *service.MetricsService
+	persister *storage.Persister
+	template  *template.Template
 }
 
 type metricData struct {
@@ -33,15 +34,16 @@ type metricsPageData struct {
 	Metrics []metricData
 }
 
-func NewMetricHandler(s *service.MetricsService) (*MetricHandler, error) {
+func NewMetricHandler(s *service.MetricsService, p *storage.Persister) (*MetricHandler, error) {
 	tmpl, err := template.New("metrics").Parse(metricsTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
 	}
 
 	return &MetricHandler{
-		service:  s,
-		template: tmpl,
+		service:   s,
+		persister: p,
+		template:  tmpl,
 	}, nil
 }
 
@@ -61,6 +63,9 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if h.persister != nil && h.persister.IsSyncMode() {
+			h.persister.SaveSync()
+		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 
@@ -73,6 +78,9 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		if err := h.service.UpdateCounter(metricName, value); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		if h.persister != nil && h.persister.IsSyncMode() {
+			h.persister.SaveSync()
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
@@ -128,7 +136,7 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 
 	for name, value := range counters {
 		metrics = append(metrics, metricData{
-			Type:  string(storage.Gauge),
+			Type:  string(storage.Counter),
 			Name:  name,
 			Value: fmt.Sprintf("%d", value),
 		})
@@ -174,6 +182,9 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		if h.persister != nil && h.persister.IsSyncMode() {
+			h.persister.SaveSync()
+		}
 		value, _ := h.service.GetGauge(req.ID)
 		resp.Value = &value
 
@@ -185,6 +196,9 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 		if err := h.service.UpdateCounter(req.ID, *req.Delta); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
+		}
+		if h.persister != nil && h.persister.IsSyncMode() {
+			h.persister.SaveSync()
 		}
 		delta, _ := h.service.GetCounter(req.ID)
 		resp.Delta = &delta
