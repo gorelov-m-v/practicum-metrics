@@ -1,6 +1,8 @@
 package storage
 
-import "sync"
+import (
+	"sync"
+)
 
 type MetricType string
 
@@ -16,6 +18,8 @@ type Storage interface {
 	GetCounter(name string) (int64, bool)
 	GetAllGauges() map[string]float64
 	GetAllCounters() map[string]int64
+	SetGauges(gauges map[string]float64)
+	SetCounters(counters map[string]int64)
 }
 
 type MemStorage struct {
@@ -75,4 +79,20 @@ func (s *MemStorage) GetAllCounters() map[string]int64 {
 		result[k] = v
 	}
 	return result
+}
+
+func (s *MemStorage) SetGauges(gauges map[string]float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for name, value := range gauges {
+		s.gauges[name] = value
+	}
+}
+
+func (s *MemStorage) SetCounters(counters map[string]int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for name, value := range counters {
+		s.counters[name] = value
+	}
 }

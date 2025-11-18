@@ -290,3 +290,121 @@ func TestGetAllCounters(t *testing.T) {
 func TestStorageInterface(t *testing.T) {
 	var _ Storage = (*MemStorage)(nil)
 }
+
+func TestSetGauges(t *testing.T) {
+	tests := []struct {
+		name   string
+		gauges map[string]float64
+	}{
+		{
+			name:   "empty map",
+			gauges: map[string]float64{},
+		},
+		{
+			name:   "single gauge",
+			gauges: map[string]float64{"Alloc": 123.456},
+		},
+		{
+			name:   "multiple gauges",
+			gauges: map[string]float64{"Alloc": 123.456, "HeapAlloc": 789.012, "Sys": 500.0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := NewMemStorage()
+			storage.SetGauges(tt.gauges)
+
+			for name, expected := range tt.gauges {
+				value, exists := storage.GetGauge(name)
+				if !exists {
+					t.Errorf("gauge %s not set", name)
+				} else if value != expected {
+					t.Errorf("gauge %s: expected %f, got %f", name, expected, value)
+				}
+			}
+		})
+	}
+}
+
+func TestSetCounters(t *testing.T) {
+	tests := []struct {
+		name     string
+		counters map[string]int64
+	}{
+		{
+			name:     "empty map",
+			counters: map[string]int64{},
+		},
+		{
+			name:     "single counter",
+			counters: map[string]int64{"PollCount": 42},
+		},
+		{
+			name:     "multiple counters",
+			counters: map[string]int64{"PollCount": 42, "Requests": 100, "Errors": 5},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storage := NewMemStorage()
+			storage.SetCounters(tt.counters)
+
+			for name, expected := range tt.counters {
+				value, exists := storage.GetCounter(name)
+				if !exists {
+					t.Errorf("counter %s not set", name)
+				} else if value != expected {
+					t.Errorf("counter %s: expected %d, got %d", name, expected, value)
+				}
+			}
+		})
+	}
+}
+
+func TestSetGauges_Overwrite(t *testing.T) {
+	storage := NewMemStorage()
+	storage.UpdateGauge("Alloc", 100.0)
+
+	storage.SetGauges(map[string]float64{"Alloc": 200.0, "Sys": 300.0})
+
+	value, _ := storage.GetGauge("Alloc")
+	if value != 200.0 {
+		t.Errorf("expected Alloc to be overwritten to 200.0, got %f", value)
+	}
+
+	sysValue, exists := storage.GetGauge("Sys")
+	if !exists {
+		t.Error("expected Sys to be set")
+	} else if sysValue != 300.0 {
+		t.Errorf("expected Sys to be 300.0, got %f", sysValue)
+	}
+}
+
+func TestSetCounters_Overwrite(t *testing.T) {
+	storage := NewMemStorage()
+	storage.UpdateCounter("PollCount", 10)
+
+	storage.SetCounters(map[string]int64{"PollCount": 50, "Requests": 100})
+
+	value, _ := storage.GetCounter("PollCount")
+	if value != 50 {
+		t.Errorf("expected PollCount to be overwritten to 50, got %d", value)
+	}
+
+	requestsValue, exists := storage.GetCounter("Requests")
+	if !exists {
+		t.Error("expected Requests to be set")
+	} else if requestsValue != 100 {
+		t.Errorf("expected Requests to be 100, got %d", requestsValue)
+	}
+}
+
+func ptrFloat64(v float64) *float64 {
+	return &v
+}
+
+func ptrInt64(v int64) *int64 {
+	return &v
+}
