@@ -57,6 +57,9 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "value")
 
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
 	switch storage.MetricType(metricType) {
 	case storage.Gauge:
 		value, err := strconv.ParseFloat(metricValue, 64)
@@ -64,7 +67,7 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid gauge value", http.StatusBadRequest)
 			return
 		}
-		if err := h.service.UpdateGauge(metricName, value); err != nil {
+		if err := h.service.UpdateGauge(ctx, metricName, value); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -80,7 +83,7 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid counter value", http.StatusBadRequest)
 			return
 		}
-		if err := h.service.UpdateCounter(metricName, value); err != nil {
+		if err := h.service.UpdateCounter(ctx, metricName, value); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -99,9 +102,12 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
 	switch storage.MetricType(metricType) {
 	case storage.Gauge:
-		value, exists := h.service.GetGauge(metricName)
+		value, exists := h.service.GetGauge(ctx, metricName)
 		if !exists {
 			http.Error(w, "Metric not found", http.StatusNotFound)
 			return
@@ -111,7 +117,7 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%g", value)
 
 	case storage.Counter:
-		value, exists := h.service.GetCounter(metricName)
+		value, exists := h.service.GetCounter(ctx, metricName)
 		if !exists {
 			http.Error(w, "Metric not found", http.StatusNotFound)
 			return
@@ -126,8 +132,11 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
-	gauges := h.service.GetAllGauges()
-	counters := h.service.GetAllCounters()
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	gauges := h.service.GetAllGauges(ctx)
+	counters := h.service.GetAllCounters(ctx)
 
 	var metrics []metricData
 
@@ -172,6 +181,9 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
 	resp := model.Metrics{
 		ID:    req.ID,
 		MType: req.MType,
@@ -183,14 +195,14 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Missing value for gauge", http.StatusBadRequest)
 			return
 		}
-		if err := h.service.UpdateGauge(req.ID, *req.Value); err != nil {
+		if err := h.service.UpdateGauge(ctx, req.ID, *req.Value); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if h.persister != nil && h.persister.IsSyncMode() {
 			h.persister.SaveSync()
 		}
-		value, _ := h.service.GetGauge(req.ID)
+		value, _ := h.service.GetGauge(ctx, req.ID)
 		resp.Value = &value
 
 	case storage.Counter:
@@ -198,14 +210,14 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Missing delta for counter", http.StatusBadRequest)
 			return
 		}
-		if err := h.service.UpdateCounter(req.ID, *req.Delta); err != nil {
+		if err := h.service.UpdateCounter(ctx, req.ID, *req.Delta); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if h.persister != nil && h.persister.IsSyncMode() {
 			h.persister.SaveSync()
 		}
-		delta, _ := h.service.GetCounter(req.ID)
+		delta, _ := h.service.GetCounter(ctx, req.ID)
 		resp.Delta = &delta
 
 	default:
@@ -230,6 +242,9 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
 	resp := model.Metrics{
 		ID:    req.ID,
 		MType: req.MType,
@@ -237,7 +252,7 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 
 	switch storage.MetricType(req.MType) {
 	case storage.Gauge:
-		value, exists := h.service.GetGauge(req.ID)
+		value, exists := h.service.GetGauge(ctx, req.ID)
 		if !exists {
 			http.Error(w, "Metric not found", http.StatusNotFound)
 			return
@@ -245,7 +260,7 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 		resp.Value = &value
 
 	case storage.Counter:
-		value, exists := h.service.GetCounter(req.ID)
+		value, exists := h.service.GetCounter(ctx, req.ID)
 		if !exists {
 			http.Error(w, "Metric not found", http.StatusNotFound)
 			return

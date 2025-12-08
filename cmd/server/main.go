@@ -29,27 +29,46 @@ func main() {
 	defer logger.Sync()
 
 	var db *database.DB
+	var store storage.Storage
+	var persister *storage.Persister
+
+	// Priority: PostgreSQL -> File -> Memory
 	if flagDatabaseDSN != "" {
+		// Use PostgreSQL storage
 		db, err = database.NewDB(flagDatabaseDSN)
 		if err != nil {
 			logger.Fatal("Failed to connect to database", zap.Error(err))
 		}
 		defer db.Close()
 		logger.Info("Database connection established")
-	}
 
-	store := storage.NewMemStorage()
-
-	persister := storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
-
-	if flagRestore {
-		if err := persister.Restore(); err != nil {
-			logger.Warn("Failed to restore metrics from file", zap.Error(err))
+		// Run migrations
+		if err := db.RunMigrations("internal/database/migrations"); err != nil {
+			logger.Fatal("Failed to run migrations", zap.Error(err))
 		}
-	}
+		logger.Info("Database migrations completed")
 
-	persister.Start()
-	defer persister.Stop()
+		store = storage.NewDBStorage(db.GetConn())
+		logger.Info("Using PostgreSQL storage")
+	} else if flagFileStoragePath != "" {
+		// Use file-backed memory storage
+		store = storage.NewMemStorage()
+		persister = storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
+
+		if flagRestore {
+			if err := persister.Restore(); err != nil {
+				logger.Warn("Failed to restore metrics from file", zap.Error(err))
+			}
+		}
+
+		persister.Start()
+		defer persister.Stop()
+		logger.Info("Using file-backed memory storage", zap.String("path", flagFileStoragePath))
+	} else {
+		// Use in-memory storage only
+		store = storage.NewMemStorage()
+		logger.Info("Using in-memory storage")
+	}
 
 	metricsService := service.NewMetricsService(store)
 	h, err := handler.NewMetricHandler(metricsService, persister, db)
@@ -89,7 +108,9 @@ func main() {
 	<-stop
 	logger.Info("Shutting down server...")
 
-	persister.SaveSync()
+	if persister != nil {
+		persister.SaveSync()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

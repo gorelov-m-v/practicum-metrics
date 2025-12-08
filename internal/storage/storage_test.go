@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 )
 
@@ -41,10 +42,11 @@ func TestUpdateGauge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
-			storage.UpdateGauge(tt.key, tt.value)
+			storage.UpdateGauge(ctx, tt.key, tt.value)
 
-			value, exists := storage.GetGauge(tt.key)
+			value, exists := storage.GetGauge(ctx, tt.key)
 
 			if !exists {
 				t.Errorf("gauge %s was not stored", tt.key)
@@ -71,16 +73,17 @@ func TestUpdateGaugeOverwrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
 
-			storage.UpdateGauge(tt.key, tt.firstValue)
-			value, _ := storage.GetGauge(tt.key)
+			storage.UpdateGauge(ctx, tt.key, tt.firstValue)
+			value, _ := storage.GetGauge(ctx, tt.key)
 			if value != tt.firstValue {
 				t.Errorf("expected initial value %f, got %f", tt.firstValue, value)
 			}
 
-			storage.UpdateGauge(tt.key, tt.finalValue)
-			value, exists := storage.GetGauge(tt.key)
+			storage.UpdateGauge(ctx, tt.key, tt.finalValue)
+			value, exists := storage.GetGauge(ctx, tt.key)
 
 			if !exists {
 				t.Errorf("gauge %s was not stored", tt.key)
@@ -107,13 +110,14 @@ func TestUpdateCounter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
 
 			for _, value := range tt.values {
-				storage.UpdateCounter(tt.key, value)
+				storage.UpdateCounter(ctx, tt.key, value)
 			}
 
-			total, exists := storage.GetCounter(tt.key)
+			total, exists := storage.GetCounter(ctx, tt.key)
 
 			if !exists {
 				t.Errorf("counter %s was not stored", tt.key)
@@ -140,13 +144,14 @@ func TestUpdateCounterAccumulation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
 
 			for i := 0; i < tt.updates; i++ {
-				storage.UpdateCounter(tt.key, 1)
+				storage.UpdateCounter(ctx, tt.key, 1)
 			}
 
-			count, exists := storage.GetCounter(tt.key)
+			count, exists := storage.GetCounter(ctx, tt.key)
 
 			if !exists {
 				t.Errorf("counter %s was not stored", tt.key)
@@ -182,18 +187,19 @@ func TestMultipleMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
 
 			for name, value := range tt.gauges {
-				storage.UpdateGauge(name, value)
+				storage.UpdateGauge(ctx, name, value)
 			}
 
 			for name, value := range tt.counters {
-				storage.UpdateCounter(name, value)
+				storage.UpdateCounter(ctx, name, value)
 			}
 
 			for name, expected := range tt.gauges {
-				value, exists := storage.GetGauge(name)
+				value, exists := storage.GetGauge(ctx, name)
 				if !exists {
 					t.Errorf("gauge %s not found", name)
 				} else if value != expected {
@@ -202,7 +208,7 @@ func TestMultipleMetrics(t *testing.T) {
 			}
 
 			for name, expected := range tt.counters {
-				value, exists := storage.GetCounter(name)
+				value, exists := storage.GetCounter(ctx, name)
 				if !exists {
 					t.Errorf("counter %s not found", name)
 				} else if value != expected {
@@ -226,13 +232,14 @@ func TestGetAllGauges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
 
 			for name, value := range tt.gauges {
-				storage.UpdateGauge(name, value)
+				storage.UpdateGauge(ctx, name, value)
 			}
 
-			result := storage.GetAllGauges()
+			result := storage.GetAllGauges(ctx)
 
 			if len(result) != tt.expected {
 				t.Errorf("expected %d gauges, got %d", tt.expected, len(result))
@@ -263,13 +270,14 @@ func TestGetAllCounters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
 
 			for name, value := range tt.counters {
-				storage.UpdateCounter(name, value)
+				storage.UpdateCounter(ctx, name, value)
 			}
 
-			result := storage.GetAllCounters()
+			result := storage.GetAllCounters(ctx)
 
 			if len(result) != tt.expected {
 				t.Errorf("expected %d counters, got %d", tt.expected, len(result))
@@ -312,11 +320,12 @@ func TestSetGauges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
-			storage.SetGauges(tt.gauges)
+			storage.SetGauges(ctx, tt.gauges)
 
 			for name, expected := range tt.gauges {
-				value, exists := storage.GetGauge(name)
+				value, exists := storage.GetGauge(ctx, name)
 				if !exists {
 					t.Errorf("gauge %s not set", name)
 				} else if value != expected {
@@ -348,11 +357,12 @@ func TestSetCounters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			storage := NewMemStorage()
-			storage.SetCounters(tt.counters)
+			storage.SetCounters(ctx, tt.counters)
 
 			for name, expected := range tt.counters {
-				value, exists := storage.GetCounter(name)
+				value, exists := storage.GetCounter(ctx, name)
 				if !exists {
 					t.Errorf("counter %s not set", name)
 				} else if value != expected {
@@ -364,17 +374,18 @@ func TestSetCounters(t *testing.T) {
 }
 
 func TestSetGauges_Overwrite(t *testing.T) {
+	ctx := context.Background()
 	storage := NewMemStorage()
-	storage.UpdateGauge("Alloc", 100.0)
+	storage.UpdateGauge(ctx, "Alloc", 100.0)
 
-	storage.SetGauges(map[string]float64{"Alloc": 200.0, "Sys": 300.0})
+	storage.SetGauges(ctx, map[string]float64{"Alloc": 200.0, "Sys": 300.0})
 
-	value, _ := storage.GetGauge("Alloc")
+	value, _ := storage.GetGauge(ctx, "Alloc")
 	if value != 200.0 {
 		t.Errorf("expected Alloc to be overwritten to 200.0, got %f", value)
 	}
 
-	sysValue, exists := storage.GetGauge("Sys")
+	sysValue, exists := storage.GetGauge(ctx, "Sys")
 	if !exists {
 		t.Error("expected Sys to be set")
 	} else if sysValue != 300.0 {
@@ -383,17 +394,18 @@ func TestSetGauges_Overwrite(t *testing.T) {
 }
 
 func TestSetCounters_Overwrite(t *testing.T) {
+	ctx := context.Background()
 	storage := NewMemStorage()
-	storage.UpdateCounter("PollCount", 10)
+	storage.UpdateCounter(ctx, "PollCount", 10)
 
-	storage.SetCounters(map[string]int64{"PollCount": 50, "Requests": 100})
+	storage.SetCounters(ctx, map[string]int64{"PollCount": 50, "Requests": 100})
 
-	value, _ := storage.GetCounter("PollCount")
+	value, _ := storage.GetCounter(ctx, "PollCount")
 	if value != 50 {
 		t.Errorf("expected PollCount to be overwritten to 50, got %d", value)
 	}
 
-	requestsValue, exists := storage.GetCounter("Requests")
+	requestsValue, exists := storage.GetCounter(ctx, "Requests")
 	if !exists {
 		t.Error("expected Requests to be set")
 	} else if requestsValue != 100 {

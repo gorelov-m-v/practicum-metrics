@@ -1,0 +1,14 @@
+CREATE TABLE IF NOT EXISTS gauges (
+    name VARCHAR(255) PRIMARY KEY,
+    value DOUBLE PRECISION NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS counters (
+    name VARCHAR(255) PRIMARY KEY,
+    value BIGINT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_gauges_updated_at ON gauges(updated_at);
+CREATE INDEX IF NOT EXISTS idx_counters_updated_at ON counters(updated_at);

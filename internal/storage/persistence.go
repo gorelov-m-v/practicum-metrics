@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"time"
@@ -74,8 +75,11 @@ func (p *Persister) Restore() error {
 }
 
 func (p *Persister) saveToFile() error {
-	gauges := p.storage.GetAllGauges()
-	counters := p.storage.GetAllCounters()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	gauges := p.storage.GetAllGauges(ctx)
+	counters := p.storage.GetAllCounters(ctx)
 
 	var metrics []model.Metrics
 
@@ -135,8 +139,15 @@ func (p *Persister) loadFromFile() error {
 		}
 	}
 
-	p.storage.SetGauges(gauges)
-	p.storage.SetCounters(counters)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := p.storage.SetGauges(ctx, gauges); err != nil {
+		return err
+	}
+	if err := p.storage.SetCounters(ctx, counters); err != nil {
+		return err
+	}
 
 	return nil
 }

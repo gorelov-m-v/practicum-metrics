@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"sync"
 )
 
@@ -12,14 +13,14 @@ const (
 )
 
 type Storage interface {
-	UpdateGauge(name string, value float64)
-	UpdateCounter(name string, value int64)
-	GetGauge(name string) (float64, bool)
-	GetCounter(name string) (int64, bool)
-	GetAllGauges() map[string]float64
-	GetAllCounters() map[string]int64
-	SetGauges(gauges map[string]float64)
-	SetCounters(counters map[string]int64)
+	UpdateGauge(ctx context.Context, name string, value float64) error
+	UpdateCounter(ctx context.Context, name string, value int64) error
+	GetGauge(ctx context.Context, name string) (float64, bool)
+	GetCounter(ctx context.Context, name string) (int64, bool)
+	GetAllGauges(ctx context.Context) map[string]float64
+	GetAllCounters(ctx context.Context) map[string]int64
+	SetGauges(ctx context.Context, gauges map[string]float64) error
+	SetCounters(ctx context.Context, counters map[string]int64) error
 }
 
 type MemStorage struct {
@@ -35,33 +36,35 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
-func (s *MemStorage) UpdateGauge(name string, value float64) {
+func (s *MemStorage) UpdateGauge(ctx context.Context, name string, value float64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.gauges[name] = value
+	return nil
 }
 
-func (s *MemStorage) UpdateCounter(name string, value int64) {
+func (s *MemStorage) UpdateCounter(ctx context.Context, name string, value int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.counters[name] += value
+	return nil
 }
 
-func (s *MemStorage) GetGauge(name string) (float64, bool) {
+func (s *MemStorage) GetGauge(ctx context.Context, name string) (float64, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	value, exists := s.gauges[name]
 	return value, exists
 }
 
-func (s *MemStorage) GetCounter(name string) (int64, bool) {
+func (s *MemStorage) GetCounter(ctx context.Context, name string) (int64, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	value, exists := s.counters[name]
 	return value, exists
 }
 
-func (s *MemStorage) GetAllGauges() map[string]float64 {
+func (s *MemStorage) GetAllGauges(ctx context.Context) map[string]float64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make(map[string]float64, len(s.gauges))
@@ -71,7 +74,7 @@ func (s *MemStorage) GetAllGauges() map[string]float64 {
 	return result
 }
 
-func (s *MemStorage) GetAllCounters() map[string]int64 {
+func (s *MemStorage) GetAllCounters(ctx context.Context) map[string]int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make(map[string]int64, len(s.counters))
@@ -81,18 +84,20 @@ func (s *MemStorage) GetAllCounters() map[string]int64 {
 	return result
 }
 
-func (s *MemStorage) SetGauges(gauges map[string]float64) {
+func (s *MemStorage) SetGauges(ctx context.Context, gauges map[string]float64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for name, value := range gauges {
 		s.gauges[name] = value
 	}
+	return nil
 }
 
-func (s *MemStorage) SetCounters(counters map[string]int64) {
+func (s *MemStorage) SetCounters(ctx context.Context, counters map[string]int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for name, value := range counters {
 		s.counters[name] = value
 	}
+	return nil
 }
