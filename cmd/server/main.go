@@ -83,6 +83,7 @@ func main() {
 	r.Use(middleware.Logging(logger))
 	r.Use(chiMiddleware.StripSlashes)
 
+	r.Post("/updates", h.UpdateMetricsBatch)
 	r.Post("/update", h.UpdateMetricJSON)
 	r.Post("/value", h.GetMetricJSON)
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)

@@ -11,6 +11,7 @@ type CounterRepository interface {
 	Set(ctx context.Context, name string, value int64) error
 	Get(ctx context.Context, name string) (int64, error)
 	GetAll(ctx context.Context) (map[string]int64, error)
+	AddBatch(ctx context.Context, tx *sql.Tx, counters map[string]int64) error
 }
 
 type counterRepository struct {
@@ -69,4 +70,25 @@ func (r *counterRepository) GetAll(ctx context.Context) (map[string]int64, error
 	}
 
 	return result, rows.Err()
+}
+
+func (r *counterRepository) AddBatch(ctx context.Context, tx *sql.Tx, counters map[string]int64) error {
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO counters (name, value, updated_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (name) DO UPDATE
+		SET value = counters.value + EXCLUDED.value, updated_at = EXCLUDED.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for name, delta := range counters {
+		if _, err := stmt.ExecContext(ctx, name, delta, now); err != nil {
+			return err
+		}
+	}
+	return nil
 }

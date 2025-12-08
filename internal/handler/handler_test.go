@@ -18,6 +18,7 @@ import (
 
 func setupRouter(h *MetricHandler) *chi.Mux {
 	r := chi.NewRouter()
+	r.Post("/updates", h.UpdateMetricsBatch)
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Post("/update/", h.UpdateMetricJSON)
 	r.Post("/update", h.UpdateMetricJSON)

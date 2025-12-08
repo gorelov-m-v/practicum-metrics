@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
@@ -45,4 +46,20 @@ func (s *MetricsService) GetAllGauges(ctx context.Context) map[string]float64 {
 
 func (s *MetricsService) GetAllCounters(ctx context.Context) map[string]int64 {
 	return s.storage.GetAllCounters(ctx)
+}
+
+func (s *MetricsService) UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error {
+	for _, metric := range metrics {
+		switch storage.MetricType(metric.MType) {
+		case storage.Gauge:
+			if metric.Value != nil && *metric.Value < 0 {
+				return fmt.Errorf("gauge value cannot be negative for metric %s", metric.ID)
+			}
+		case storage.Counter:
+			if metric.Delta != nil && *metric.Delta < 0 {
+				return fmt.Errorf("counter value cannot be negative for metric %s", metric.ID)
+			}
+		}
+	}
+	return s.storage.UpdateMetricsBatch(ctx, metrics)
 }

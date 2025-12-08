@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"sync"
+
+	"github.com/user/practicum-metrics/internal/model"
 )
 
 type MetricType string
@@ -21,6 +23,7 @@ type Storage interface {
 	GetAllCounters(ctx context.Context) map[string]int64
 	SetGauges(ctx context.Context, gauges map[string]float64) error
 	SetCounters(ctx context.Context, counters map[string]int64) error
+	UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error
 }
 
 type MemStorage struct {
@@ -98,6 +101,25 @@ func (s *MemStorage) SetCounters(ctx context.Context, counters map[string]int64)
 	defer s.mu.Unlock()
 	for name, value := range counters {
 		s.counters[name] = value
+	}
+	return nil
+}
+
+func (s *MemStorage) UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, metric := range metrics {
+		switch MetricType(metric.MType) {
+		case Gauge:
+			if metric.Value != nil {
+				s.gauges[metric.ID] = *metric.Value
+			}
+		case Counter:
+			if metric.Delta != nil {
+				s.counters[metric.ID] += *metric.Delta
+			}
+		}
 	}
 	return nil
 }

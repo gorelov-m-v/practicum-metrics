@@ -296,3 +296,33 @@ func (h *MetricHandler) PingDB(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *MetricHandler) UpdateMetricsBatch(w http.ResponseWriter, r *http.Request) {
+	var metrics []model.Metrics
+
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&metrics); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if len(metrics) == 0 {
+		http.Error(w, "Empty batch not allowed", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	if err := h.service.UpdateMetricsBatch(ctx, metrics); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if h.persister != nil && h.persister.IsSyncMode() {
+		h.persister.SaveSync()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}

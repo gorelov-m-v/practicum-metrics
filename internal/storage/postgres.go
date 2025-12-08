@@ -3,17 +3,21 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
+	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/repository"
 )
 
 type DBStorage struct {
+	db          *sql.DB
 	gaugeRepo   repository.GaugeRepository
 	counterRepo repository.CounterRepository
 }
 
 func NewDBStorage(db *sql.DB) *DBStorage {
 	return &DBStorage{
+		db:          db,
 		gaugeRepo:   repository.NewGaugeRepository(db),
 		counterRepo: repository.NewCounterRepository(db),
 	}
@@ -80,5 +84,47 @@ func (s *DBStorage) SetCounters(ctx context.Context, counters map[string]int64) 
 			return err
 		}
 	}
+	return nil
+}
+
+func (s *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	gauges := make(map[string]float64)
+	counters := make(map[string]int64)
+
+	for _, metric := range metrics {
+		switch MetricType(metric.MType) {
+		case Gauge:
+			if metric.Value != nil {
+				gauges[metric.ID] = *metric.Value
+			}
+		case Counter:
+			if metric.Delta != nil {
+				counters[metric.ID] += *metric.Delta
+			}
+		}
+	}
+
+	if len(gauges) > 0 {
+		if err := s.gaugeRepo.UpsertBatch(ctx, tx, gauges); err != nil {
+			return fmt.Errorf("failed to upsert gauges: %w", err)
+		}
+	}
+
+	if len(counters) > 0 {
+		if err := s.counterRepo.AddBatch(ctx, tx, counters); err != nil {
+			return fmt.Errorf("failed to add counters: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
 	return nil
 }
