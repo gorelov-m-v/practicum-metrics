@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/service"
@@ -27,6 +28,16 @@ func main() {
 	}
 	defer logger.Sync()
 
+	var db *database.DB
+	if flagDatabaseDSN != "" {
+		db, err = database.NewDB(flagDatabaseDSN)
+		if err != nil {
+			logger.Fatal("Failed to connect to database", zap.Error(err))
+		}
+		defer db.Close()
+		logger.Info("Database connection established")
+	}
+
 	store := storage.NewMemStorage()
 
 	persister := storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
@@ -41,7 +52,7 @@ func main() {
 	defer persister.Stop()
 
 	metricsService := service.NewMetricsService(store)
-	h, err := handler.NewMetricHandler(metricsService, persister)
+	h, err := handler.NewMetricHandler(metricsService, persister, db)
 	if err != nil {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}
@@ -58,6 +69,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
+	r.Get("/ping", h.PingDB)
 
 	server := &http.Server{
 		Addr:    flagRunAddr,

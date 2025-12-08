@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -8,8 +9,10 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
@@ -22,6 +25,7 @@ type MetricHandler struct {
 	service   *service.MetricsService
 	persister *storage.Persister
 	template  *template.Template
+	db        *database.DB
 }
 
 type metricData struct {
@@ -34,7 +38,7 @@ type metricsPageData struct {
 	Metrics []metricData
 }
 
-func NewMetricHandler(s *service.MetricsService, p *storage.Persister) (*MetricHandler, error) {
+func NewMetricHandler(s *service.MetricsService, p *storage.Persister, db *database.DB) (*MetricHandler, error) {
 	tmpl, err := template.New("metrics").Parse(metricsTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
@@ -44,6 +48,7 @@ func NewMetricHandler(s *service.MetricsService, p *storage.Persister) (*MetricH
 		service:   s,
 		persister: p,
 		template:  tmpl,
+		db:        db,
 	}, nil
 }
 
@@ -258,4 +263,21 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	if err := enc.Encode(resp); err != nil {
 		return
 	}
+}
+
+func (h *MetricHandler) PingDB(w http.ResponseWriter, r *http.Request) {
+	if h.db == nil {
+		http.Error(w, "Database not configured", http.StatusInternalServerError)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+	defer cancel()
+
+	if err := h.db.Ping(ctx); err != nil {
+		http.Error(w, "Database ping failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
