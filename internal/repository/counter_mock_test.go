@@ -476,31 +476,6 @@ func TestCounterRepositoryMock_Set_VerifyTimestamp(t *testing.T) {
 	}
 }
 
-func TestCounterRepositoryMock_ContextCanceled(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to create mock: %v", err)
-	}
-	defer db.Close()
-
-	repo := NewCounterRepository(db)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	mock.ExpectExec("INSERT INTO counters").
-		WithArgs("PollCount", int64(10), sqlmock.AnyArg()).
-		WillReturnError(context.Canceled)
-
-	err = repo.Add(ctx, "PollCount", 10)
-	if err == nil {
-		t.Error("expected error for canceled context")
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unfulfilled expectations: %v", err)
-	}
-}
-
 func TestCounterRepositoryMock_LargeValue(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

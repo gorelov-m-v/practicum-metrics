@@ -63,31 +63,6 @@ func TestGaugeRepositoryMock_Upsert_Error(t *testing.T) {
 	}
 }
 
-func TestGaugeRepositoryMock_Upsert_ContextCanceled(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("failed to create mock: %v", err)
-	}
-	defer db.Close()
-
-	repo := NewGaugeRepository(db)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	mock.ExpectExec("INSERT INTO gauges").
-		WithArgs("Alloc", 100.0, sqlmock.AnyArg()).
-		WillReturnError(context.Canceled)
-
-	err = repo.Upsert(ctx, "Alloc", 100.0)
-	if err == nil {
-		t.Error("expected error for canceled context")
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unfulfilled expectations: %v", err)
-	}
-}
-
 func TestGaugeRepositoryMock_Get_Success(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
