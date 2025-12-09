@@ -124,7 +124,7 @@ func TestWithRetry_SuccessAfterRetries(t *testing.T) {
 		t.Errorf("expected 3 attempts, got %d", attempts)
 	}
 
-	expectedDuration := 4 * time.Second
+	expectedDuration := 1 * time.Second
 	if elapsed < expectedDuration || elapsed > expectedDuration+500*time.Millisecond {
 		t.Logf("warning: expected duration around %v, got %v", expectedDuration, elapsed)
 	}
@@ -150,7 +150,7 @@ func TestWithRetry_AllRetriesFailed(t *testing.T) {
 		t.Errorf("expected %d attempts, got %d", expectedAttempts, attempts)
 	}
 
-	expectedDuration := 9 * time.Second
+	expectedDuration := 4 * time.Second
 	if elapsed < expectedDuration || elapsed > expectedDuration+500*time.Millisecond {
 		t.Logf("warning: expected duration around %v, got %v", expectedDuration, elapsed)
 	}
@@ -254,17 +254,17 @@ func TestWithRetry_RetryIntervals(t *testing.T) {
 	tolerance := 200 * time.Millisecond
 
 	interval1 := timestamps[1].Sub(timestamps[0])
-	if interval1 < time.Second-tolerance || interval1 > time.Second+tolerance {
-		t.Errorf("expected first interval ~1s, got %v", interval1)
+	if interval1 > tolerance {
+		t.Errorf("expected first interval ~0s, got %v", interval1)
 	}
 
 	interval2 := timestamps[2].Sub(timestamps[1])
-	if interval2 < 3*time.Second-tolerance || interval2 > 3*time.Second+tolerance {
-		t.Errorf("expected second interval ~3s, got %v", interval2)
+	if interval2 < time.Second-tolerance || interval2 > time.Second+tolerance {
+		t.Errorf("expected second interval ~1s, got %v", interval2)
 	}
 
 	interval3 := timestamps[3].Sub(timestamps[2])
-	if interval3 < 5*time.Second-tolerance || interval3 > 5*time.Second+tolerance {
-		t.Errorf("expected third interval ~5s, got %v", interval3)
+	if interval3 < 3*time.Second-tolerance || interval3 > 3*time.Second+tolerance {
+		t.Errorf("expected third interval ~3s, got %v", interval3)
 	}
 }

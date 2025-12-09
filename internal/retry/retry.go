@@ -33,13 +33,19 @@ func IsRetriableError(err error) bool {
 }
 
 func WithRetry(operation func() error) error {
+	err := operation()
+	if err == nil || !IsRetriableError(err) {
+		return err
+	}
+
 	return retry.Do(
 		operation,
-		retry.Attempts(uint(MaxRetries+1)),
+		retry.Attempts(uint(MaxRetries)),
 		retry.DelayType(delayFunc),
 		retry.RetryIf(func(err error) bool {
 			return IsRetriableError(err)
 		}),
+		retry.LastErrorOnly(true),
 	)
 }
 
@@ -48,6 +54,7 @@ func Do(operation func() error) error {
 		operation,
 		retry.Attempts(uint(MaxRetries)),
 		retry.DelayType(delayFunc),
+		retry.LastErrorOnly(true),
 	)
 }
 
