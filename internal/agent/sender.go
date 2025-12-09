@@ -16,10 +16,14 @@ import (
 
 const (
 	maxRetries     = 3
-	retryDelay     = 1 * time.Second
-	retryBackoff   = 2 * time.Second
 	defaultTimeout = 5 * time.Second
 )
+
+var retryIntervals = []time.Duration{
+	1 * time.Second,
+	3 * time.Second,
+	5 * time.Second,
+}
 
 type MetricsSender struct {
 	serverAddress string
@@ -54,7 +58,6 @@ func (ms *MetricsSender) sendMetric(metricType, name, value string) error {
 	}
 
 	var lastErr error
-	delay := retryDelay
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		resp, err := ms.client.Post(reqURL)
@@ -69,8 +72,7 @@ func (ms *MetricsSender) sendMetric(metricType, name, value string) error {
 		}
 
 		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
+			time.Sleep(retryIntervals[attempt])
 		}
 	}
 
@@ -106,7 +108,6 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 	}
 
 	var lastErr error
-	delay := retryDelay
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
@@ -130,8 +131,7 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		}
 
 		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
+			time.Sleep(retryIntervals[attempt])
 		}
 	}
 
@@ -181,7 +181,6 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 	}
 
 	var lastErr error
-	delay := retryDelay
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
@@ -205,8 +204,7 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 		}
 
 		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
+			time.Sleep(retryIntervals[attempt])
 		}
 	}
 

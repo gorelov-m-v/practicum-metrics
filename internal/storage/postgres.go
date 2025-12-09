@@ -7,6 +7,7 @@ import (
 
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/repository"
+	"github.com/user/practicum-metrics/internal/retry"
 )
 
 type DBStorage struct {
@@ -88,43 +89,45 @@ func (s *DBStorage) SetCounters(ctx context.Context, counters map[string]int64) 
 }
 
 func (s *DBStorage) UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
+	return retry.WithRetry(func() error {
+		tx, err := s.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("failed to begin transaction: %w", err)
+		}
+		defer tx.Rollback()
 
-	gauges := make(map[string]float64)
-	counters := make(map[string]int64)
+		gauges := make(map[string]float64)
+		counters := make(map[string]int64)
 
-	for _, metric := range metrics {
-		switch MetricType(metric.MType) {
-		case Gauge:
-			if metric.Value != nil {
-				gauges[metric.ID] = *metric.Value
+		for _, metric := range metrics {
+			switch MetricType(metric.MType) {
+			case Gauge:
+				if metric.Value != nil {
+					gauges[metric.ID] = *metric.Value
+				}
+			case Counter:
+				if metric.Delta != nil {
+					counters[metric.ID] += *metric.Delta
+				}
 			}
-		case Counter:
-			if metric.Delta != nil {
-				counters[metric.ID] += *metric.Delta
+		}
+
+		if len(gauges) > 0 {
+			if err := s.gaugeRepo.UpsertBatch(ctx, tx, gauges); err != nil {
+				return fmt.Errorf("failed to upsert gauges: %w", err)
 			}
 		}
-	}
 
-	if len(gauges) > 0 {
-		if err := s.gaugeRepo.UpsertBatch(ctx, tx, gauges); err != nil {
-			return fmt.Errorf("failed to upsert gauges: %w", err)
+		if len(counters) > 0 {
+			if err := s.counterRepo.AddBatch(ctx, tx, counters); err != nil {
+				return fmt.Errorf("failed to add counters: %w", err)
+			}
 		}
-	}
 
-	if len(counters) > 0 {
-		if err := s.counterRepo.AddBatch(ctx, tx, counters); err != nil {
-			return fmt.Errorf("failed to add counters: %w", err)
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit transaction: %w", err)
 		}
-	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+		return nil
+	})
 }
