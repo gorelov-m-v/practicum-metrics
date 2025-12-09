@@ -4,12 +4,13 @@ import (
 	"errors"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const (
-	maxRetries = 3
+	MaxRetries = 3
 )
 
 var retryIntervals = []time.Duration{
@@ -32,29 +33,27 @@ func IsRetriableError(err error) bool {
 }
 
 func WithRetry(operation func() error) error {
-	var lastErr error
+	return retry.Do(
+		operation,
+		retry.Attempts(uint(MaxRetries+1)),
+		retry.DelayType(delayFunc),
+		retry.RetryIf(func(err error) bool {
+			return IsRetriableError(err)
+		}),
+	)
+}
 
-	lastErr = operation()
-	if lastErr == nil {
-		return nil
+func Do(operation func() error) error {
+	return retry.Do(
+		operation,
+		retry.Attempts(uint(MaxRetries)),
+		retry.DelayType(delayFunc),
+	)
+}
+
+func delayFunc(n uint, err error, config *retry.Config) time.Duration {
+	if n > 0 && int(n-1) < len(retryIntervals) {
+		return retryIntervals[n-1]
 	}
-
-	if !IsRetriableError(lastErr) {
-		return lastErr
-	}
-
-	for i := 0; i < maxRetries; i++ {
-		time.Sleep(retryIntervals[i])
-
-		lastErr = operation()
-		if lastErr == nil {
-			return nil
-		}
-
-		if !IsRetriableError(lastErr) {
-			return lastErr
-		}
-	}
-
-	return lastErr
+	return 1 * time.Second
 }
