@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/model"
@@ -11,11 +12,22 @@ import (
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
+type ServiceTimeouts struct {
+	DefaultOperationTimeout time.Duration
+}
+
+func DefaultServiceTimeouts() ServiceTimeouts {
+	return ServiceTimeouts{
+		DefaultOperationTimeout: 5 * time.Second,
+	}
+}
+
 type MetricsService struct {
 	storage     storage.Storage
 	txManager   database.TransactionManager
 	gaugeRepo   repository.GaugeRepository
 	counterRepo repository.CounterRepository
+	timeouts    ServiceTimeouts
 }
 
 func NewMetricsService(storage storage.Storage, txManager database.TransactionManager, gaugeRepo repository.GaugeRepository, counterRepo repository.CounterRepository) *MetricsService {
@@ -24,10 +36,14 @@ func NewMetricsService(storage storage.Storage, txManager database.TransactionMa
 		txManager:   txManager,
 		gaugeRepo:   gaugeRepo,
 		counterRepo: counterRepo,
+		timeouts:    DefaultServiceTimeouts(),
 	}
 }
 
 func (s *MetricsService) UpdateGauge(ctx context.Context, name string, value float64) error {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	if value < 0 {
 		return fmt.Errorf("gauge value cannot be negative")
 	}
@@ -35,6 +51,9 @@ func (s *MetricsService) UpdateGauge(ctx context.Context, name string, value flo
 }
 
 func (s *MetricsService) UpdateCounter(ctx context.Context, name string, value int64) error {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	if value < 0 {
 		return fmt.Errorf("counter value cannot be negative")
 	}
@@ -42,22 +61,37 @@ func (s *MetricsService) UpdateCounter(ctx context.Context, name string, value i
 }
 
 func (s *MetricsService) GetGauge(ctx context.Context, name string) (float64, bool) {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	return s.storage.GetGauge(ctx, name)
 }
 
 func (s *MetricsService) GetCounter(ctx context.Context, name string) (int64, bool) {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	return s.storage.GetCounter(ctx, name)
 }
 
 func (s *MetricsService) GetAllGauges(ctx context.Context) map[string]float64 {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	return s.storage.GetAllGauges(ctx)
 }
 
 func (s *MetricsService) GetAllCounters(ctx context.Context) map[string]int64 {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	return s.storage.GetAllCounters(ctx)
 }
 
 func (s *MetricsService) UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error {
+	ctx, cancel := context.WithTimeout(ctx, s.timeouts.DefaultOperationTimeout)
+	defer cancel()
+
 	for _, metric := range metrics {
 		switch storage.MetricType(metric.MType) {
 		case storage.Gauge:
