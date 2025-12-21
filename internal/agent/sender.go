@@ -11,13 +11,11 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/user/practicum-metrics/internal/model"
+	"github.com/user/practicum-metrics/internal/retry"
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
 const (
-	maxRetries     = 3
-	retryDelay     = 1 * time.Second
-	retryBackoff   = 2 * time.Second
 	defaultTimeout = 5 * time.Second
 )
 
@@ -53,28 +51,16 @@ func (ms *MetricsSender) sendMetric(metricType, name, value string) error {
 		return fmt.Errorf("failed to build URL: %w", err)
 	}
 
-	var lastErr error
-	delay := retryDelay
-
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	return retry.Do(func() error {
 		resp, err := ms.client.Post(reqURL)
-		if err == nil && resp.StatusCode() == http.StatusOK {
-			return nil
-		}
-
 		if err != nil {
-			lastErr = fmt.Errorf("failed to send metric: %w", err)
-		} else {
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode())
+			return fmt.Errorf("failed to send metric: %w", err)
 		}
-
-		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
+		if resp.StatusCode() != http.StatusOK {
+			return fmt.Errorf("unexpected status code: %d", resp.StatusCode())
 		}
-	}
-
-	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+		return nil
+	})
 }
 
 func (ms *MetricsSender) SendGauge(name string, value float64) error {
@@ -105,10 +91,7 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		return fmt.Errorf("failed to close gzip writer: %w", err)
 	}
 
-	var lastErr error
-	delay := retryDelay
-
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	return retry.Do(func() error {
 		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
@@ -119,23 +102,16 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		req.Header.Set("Accept-Encoding", "gzip")
 
 		resp, err := ms.httpClient.Do(req)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				return nil
-			}
-			lastErr = fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-		} else {
-			lastErr = fmt.Errorf("failed to send metric: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to send metric: %w", err)
 		}
+		defer resp.Body.Close()
 
-		if attempt < maxRetries-1 {
-			time.Sleep(delay)
-			delay += retryBackoff
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 		}
-	}
-
-	return fmt.Errorf("failed after %d retries: %w", maxRetries, lastErr)
+		return nil
+	})
 }
 
 func (ms *MetricsSender) SendGaugeJSON(name string, value float64) error {
@@ -154,4 +130,51 @@ func (ms *MetricsSender) SendCounterJSON(name string, value int64) error {
 		Delta: &value,
 	}
 	return ms.sendMetricJSON(metric)
+}
+
+func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	reqURL, err := url.JoinPath(ms.serverAddress, "updates")
+	if err != nil {
+		return fmt.Errorf("failed to build URL: %w", err)
+	}
+
+	body, err := json.Marshal(metrics)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(body); err != nil {
+		return fmt.Errorf("failed to compress data: %w", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		return fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	return retry.Do(func() error {
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept-Encoding", "gzip")
+
+		resp, err := ms.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send metrics batch: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		}
+		return nil
+	})
 }

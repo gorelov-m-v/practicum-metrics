@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 
 func setupRouter(h *MetricHandler) *chi.Mux {
 	r := chi.NewRouter()
+	r.Post("/updates", h.UpdateMetricsBatch)
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Post("/update/", h.UpdateMetricJSON)
 	r.Post("/update", h.UpdateMetricJSON)
@@ -37,8 +39,8 @@ func TestNewMetricHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -101,8 +103,8 @@ func TestUpdateMetric_Gauge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -118,7 +120,8 @@ func TestUpdateMetric_Gauge(t *testing.T) {
 			}
 
 			if tt.checkValue && w.Code == http.StatusOK {
-				value, exists := store.GetGauge(tt.metricName)
+				ctx := context.Background()
+				value, exists := store.GetGauge(ctx, tt.metricName)
 
 				if !exists {
 					t.Errorf("metric %s was not stored", tt.metricName)
@@ -184,8 +187,8 @@ func TestUpdateMetric_Counter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -201,7 +204,8 @@ func TestUpdateMetric_Counter(t *testing.T) {
 			}
 
 			if tt.checkValue && w.Code == http.StatusOK {
-				value, exists := store.GetCounter(tt.metricName)
+				ctx := context.Background()
+				value, exists := store.GetCounter(ctx, tt.metricName)
 
 				if !exists {
 					t.Errorf("metric %s was not stored", tt.metricName)
@@ -234,8 +238,8 @@ func TestUpdateMetric_InvalidType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -268,8 +272,8 @@ func TestUpdateMetric_ContentType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -306,8 +310,8 @@ func TestUpdateMetric_CounterAccumulation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -324,7 +328,8 @@ func TestUpdateMetric_CounterAccumulation(t *testing.T) {
 				}
 			}
 
-			value, exists := store.GetCounter(tt.metricName)
+			ctx := context.Background()
+			value, exists := store.GetCounter(ctx, tt.metricName)
 			if !exists {
 				t.Errorf("%s was not stored", tt.metricName)
 			}
@@ -352,8 +357,8 @@ func TestUpdateMetric_GaugeOverwrite(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -367,7 +372,8 @@ func TestUpdateMetric_GaugeOverwrite(t *testing.T) {
 			w2 := httptest.NewRecorder()
 			router.ServeHTTP(w2, req2)
 
-			value, exists := store.GetGauge(tt.metricName)
+			ctx := context.Background()
+			value, exists := store.GetGauge(ctx, tt.metricName)
 			if !exists {
 				t.Errorf("%s was not stored", tt.metricName)
 			}
@@ -395,13 +401,14 @@ func TestGetMetric_Gauge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := storage.NewMemStorage()
 			if tt.setupMetric {
-				store.UpdateGauge(tt.metricName, tt.metricValue)
+				store.UpdateGauge(ctx, tt.metricName, tt.metricValue)
 			}
 
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -441,13 +448,14 @@ func TestGetMetric_Counter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := storage.NewMemStorage()
 			if tt.setupMetric {
-				store.UpdateCounter(tt.metricName, tt.metricValue)
+				store.UpdateCounter(ctx, tt.metricName, tt.metricValue)
 			}
 
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -485,8 +493,8 @@ func TestGetMetric_InvalidType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -544,18 +552,19 @@ func TestListMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := storage.NewMemStorage()
 
 			for name, value := range tt.gauges {
-				store.UpdateGauge(name, value)
+				store.UpdateGauge(ctx, name, value)
 			}
 
 			for name, value := range tt.counters {
-				store.UpdateCounter(name, value)
+				store.UpdateCounter(ctx, name, value)
 			}
 
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -639,8 +648,8 @@ func TestUpdateMetricJSON_Gauge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -658,7 +667,8 @@ func TestUpdateMetricJSON_Gauge(t *testing.T) {
 			}
 
 			if tt.checkValue && w.Code == http.StatusOK {
-				value, exists := store.GetGauge(tt.requestBody.ID)
+				ctx := context.Background()
+				value, exists := store.GetGauge(ctx, tt.requestBody.ID)
 				if !exists {
 					t.Errorf("metric %s was not stored", tt.requestBody.ID)
 				} else if value != tt.expectedValue {
@@ -739,8 +749,8 @@ func TestUpdateMetricJSON_Counter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -758,7 +768,8 @@ func TestUpdateMetricJSON_Counter(t *testing.T) {
 			}
 
 			if tt.checkValue && w.Code == http.StatusOK {
-				value, exists := store.GetCounter(tt.requestBody.ID)
+				ctx := context.Background()
+				value, exists := store.GetCounter(ctx, tt.requestBody.ID)
 				if !exists {
 					t.Errorf("metric %s was not stored", tt.requestBody.ID)
 				} else if value != tt.expectedValue {
@@ -809,8 +820,8 @@ func TestUpdateMetricJSON_InvalidJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -857,13 +868,14 @@ func TestGetMetricJSON_Gauge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := storage.NewMemStorage()
 			if tt.setupMetric {
-				store.UpdateGauge(tt.metricName, tt.metricValue)
+				store.UpdateGauge(ctx, tt.metricName, tt.metricValue)
 			}
 
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -941,13 +953,14 @@ func TestGetMetricJSON_Counter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := storage.NewMemStorage()
 			if tt.setupMetric {
-				store.UpdateCounter(tt.metricName, tt.metricValue)
+				store.UpdateCounter(ctx, tt.metricName, tt.metricValue)
 			}
 
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -1013,8 +1026,8 @@ func TestGetMetricJSON_InvalidJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -1093,8 +1106,8 @@ func TestUpdateMetricJSON_WithTrailingSlash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -1142,7 +1155,8 @@ func TestGetMetricJSON_WithTrailingSlash(t *testing.T) {
 			name: "POST /value/ for gauge",
 			path: "/value/",
 			setupMetric: func(s *storage.MemStorage) {
-				s.UpdateGauge("TestGauge", 123.456)
+				ctx := context.Background()
+				s.UpdateGauge(ctx, "TestGauge", 123.456)
 			},
 			requestBody: model.Metrics{
 				ID:    "TestGauge",
@@ -1155,7 +1169,8 @@ func TestGetMetricJSON_WithTrailingSlash(t *testing.T) {
 			name: "POST /value for gauge",
 			path: "/value",
 			setupMetric: func(s *storage.MemStorage) {
-				s.UpdateGauge("TestGauge2", 456.789)
+				ctx := context.Background()
+				s.UpdateGauge(ctx, "TestGauge2", 456.789)
 			},
 			requestBody: model.Metrics{
 				ID:    "TestGauge2",
@@ -1168,7 +1183,8 @@ func TestGetMetricJSON_WithTrailingSlash(t *testing.T) {
 			name: "POST /value/ for counter",
 			path: "/value/",
 			setupMetric: func(s *storage.MemStorage) {
-				s.UpdateCounter("TestCounter", 100)
+				ctx := context.Background()
+				s.UpdateCounter(ctx, "TestCounter", 100)
 			},
 			requestBody: model.Metrics{
 				ID:    "TestCounter",
@@ -1181,7 +1197,8 @@ func TestGetMetricJSON_WithTrailingSlash(t *testing.T) {
 			name: "POST /value for counter",
 			path: "/value",
 			setupMetric: func(s *storage.MemStorage) {
-				s.UpdateCounter("TestCounter2", 200)
+				ctx := context.Background()
+				s.UpdateCounter(ctx, "TestCounter2", 200)
 			},
 			requestBody: model.Metrics{
 				ID:    "TestCounter2",
@@ -1197,8 +1214,8 @@ func TestGetMetricJSON_WithTrailingSlash(t *testing.T) {
 			store := storage.NewMemStorage()
 			tt.setupMetric(store)
 
-			metricsService := service.NewMetricsService(store)
-			handler, err := NewMetricHandler(metricsService, nil)
+			metricsService := service.NewMetricsService(store, nil, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}

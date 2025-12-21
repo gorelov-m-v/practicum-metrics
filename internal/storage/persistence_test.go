@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -90,9 +91,10 @@ func TestPersister_SaveSync(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := NewMemStorage()
 			for name, value := range tt.gauges {
-				store.UpdateGauge(name, value)
+				store.UpdateGauge(ctx, name, value)
 			}
 
 			tmpFile := filepath.Join(t.TempDir(), "metrics.json")
@@ -112,7 +114,7 @@ func TestPersister_SaveSync(t *testing.T) {
 			}
 
 			for name, expectedValue := range tt.gauges {
-				value, exists := loadedStore.GetGauge(name)
+				value, exists := loadedStore.GetGauge(ctx, name)
 				if !exists {
 					t.Errorf("gauge %s not found after reload", name)
 				} else if value != expectedValue {
@@ -124,8 +126,9 @@ func TestPersister_SaveSync(t *testing.T) {
 }
 
 func TestPersister_SaveSync_InvalidPath(t *testing.T) {
+	ctx := context.Background()
 	store := NewMemStorage()
-	store.UpdateGauge("TestMetric", 100.0)
+	store.UpdateGauge(ctx, "TestMetric", 100.0)
 
 	logger := zap.NewNop()
 	persister := NewPersister(store, "/invalid/path/that/does/not/exist/metrics.json", 0, logger)
@@ -147,8 +150,9 @@ func TestPersister_StartStop_SyncMode(t *testing.T) {
 }
 
 func TestPersister_StartStop_AsyncMode(t *testing.T) {
+	ctx := context.Background()
 	store := NewMemStorage()
-	store.UpdateGauge("TestMetric", 123.456)
+	store.UpdateGauge(ctx, "TestMetric", 123.456)
 
 	tmpFile := filepath.Join(t.TempDir(), "metrics.json")
 
@@ -170,7 +174,7 @@ func TestPersister_StartStop_AsyncMode(t *testing.T) {
 		t.Fatalf("failed to load saved file: %v", err)
 	}
 
-	value, exists := loadedStore.GetGauge("TestMetric")
+	value, exists := loadedStore.GetGauge(ctx, "TestMetric")
 	if !exists {
 		t.Error("metric not found after periodic save")
 	} else if value != 123.456 {
@@ -179,6 +183,7 @@ func TestPersister_StartStop_AsyncMode(t *testing.T) {
 }
 
 func TestPersister_PeriodicSave_MultipleUpdates(t *testing.T) {
+	ctx := context.Background()
 	store := NewMemStorage()
 	tmpFile := filepath.Join(t.TempDir(), "metrics.json")
 
@@ -187,10 +192,10 @@ func TestPersister_PeriodicSave_MultipleUpdates(t *testing.T) {
 	persister.Start()
 	defer persister.Stop()
 
-	store.UpdateGauge("Metric1", 100.0)
+	store.UpdateGauge(ctx, "Metric1", 100.0)
 	time.Sleep(500 * time.Millisecond)
 
-	store.UpdateGauge("Metric2", 200.0)
+	store.UpdateGauge(ctx, "Metric2", 200.0)
 	time.Sleep(600 * time.Millisecond)
 
 	loadedStore := NewMemStorage()
@@ -199,7 +204,7 @@ func TestPersister_PeriodicSave_MultipleUpdates(t *testing.T) {
 		t.Fatalf("failed to load saved file: %v", err)
 	}
 
-	value1, exists1 := loadedStore.GetGauge("Metric1")
+	value1, exists1 := loadedStore.GetGauge(ctx, "Metric1")
 	if !exists1 {
 		t.Error("Metric1 not found")
 	} else if value1 != 100.0 {

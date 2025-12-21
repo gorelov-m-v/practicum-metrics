@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/user/practicum-metrics/internal/agent"
+	"github.com/user/practicum-metrics/internal/model"
 	"go.uber.org/zap"
 )
 
@@ -53,14 +54,25 @@ func main() {
 			gauges := collector.GetGauges()
 			pollCount := collector.GetPollCount()
 
+			var metrics []model.Metrics
 			for name, value := range gauges {
-				if err := sender.SendGaugeJSON(name, value); err != nil {
-					logger.Error("Failed to send gauge", zap.String("metric", name), zap.Error(err))
-				}
+				v := value
+				metrics = append(metrics, model.Metrics{
+					ID:    name,
+					MType: "gauge",
+					Value: &v,
+				})
 			}
 
-			if err := sender.SendCounterJSON(agent.MetricPollCount, pollCount); err != nil {
-				logger.Error("Failed to send counter", zap.String("metric", agent.MetricPollCount), zap.Error(err))
+			delta := pollCount
+			metrics = append(metrics, model.Metrics{
+				ID:    agent.MetricPollCount,
+				MType: "counter",
+				Delta: &delta,
+			})
+
+			if err := sender.SendMetricsBatch(metrics); err != nil {
+				logger.Error("Failed to send metrics batch", zap.Error(err))
 			}
 		}
 	}

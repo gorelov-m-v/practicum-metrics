@@ -11,8 +11,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
+	"github.com/user/practicum-metrics/internal/repository"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
 	"go.uber.org/zap"
@@ -27,21 +29,56 @@ func main() {
 	}
 	defer logger.Sync()
 
-	store := storage.NewMemStorage()
+	var db *database.DB
+	var store storage.Storage
+	var persister *storage.Persister
+	var txManager database.TransactionManager
+	var gaugeRepo repository.GaugeRepository
+	var counterRepo repository.CounterRepository
 
-	persister := storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
-
-	if flagRestore {
-		if err := persister.Restore(); err != nil {
-			logger.Warn("Failed to restore metrics from file", zap.Error(err))
+	// Priority: PostgreSQL -> File -> Memory
+	if flagDatabaseDSN != "" {
+		// Use PostgreSQL storage
+		db, err = database.NewDB(flagDatabaseDSN)
+		if err != nil {
+			logger.Fatal("Failed to connect to database", zap.Error(err))
 		}
+		defer db.Close()
+		logger.Info("Database connection established")
+
+		// Run migrations
+		if err := db.RunMigrations("internal/database/migrations"); err != nil {
+			logger.Fatal("Failed to run migrations", zap.Error(err))
+		}
+		logger.Info("Database migrations completed")
+
+		store = storage.NewDBStorage(db.GetConn())
+		txManager = database.NewTransactionManager(db.GetConn())
+		gaugeRepo = repository.NewGaugeRepository(db.GetConn())
+		counterRepo = repository.NewCounterRepository(db.GetConn())
+		logger.Info("Using PostgreSQL storage")
+	} else if flagFileStoragePath != "" {
+		// Use file-backed memory storage
+		store = storage.NewMemStorage()
+		persister = storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
+
+		if flagRestore {
+			if err := persister.Restore(); err != nil {
+				logger.Warn("Failed to restore metrics from file", zap.Error(err))
+			}
+		}
+
+		persister.Start()
+		defer persister.Stop()
+		logger.Info("Using file-backed memory storage", zap.String("path", flagFileStoragePath))
+	} else {
+		// Use in-memory storage only
+		store = storage.NewMemStorage()
+		logger.Info("Using in-memory storage")
 	}
 
-	persister.Start()
-	defer persister.Stop()
-
-	metricsService := service.NewMetricsService(store)
-	h, err := handler.NewMetricHandler(metricsService, persister)
+	metricsService := service.NewMetricsService(store, txManager, gaugeRepo, counterRepo)
+	h, err := handler.NewMetricHandler(metricsService, persister, db)
 	if err != nil {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}
@@ -53,11 +90,13 @@ func main() {
 	r.Use(middleware.Logging(logger))
 	r.Use(chiMiddleware.StripSlashes)
 
+	r.Post("/updates", h.UpdateMetricsBatch)
 	r.Post("/update", h.UpdateMetricJSON)
 	r.Post("/value", h.GetMetricJSON)
 	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
+	r.Get("/ping", h.PingDB)
 
 	server := &http.Server{
 		Addr:    flagRunAddr,
@@ -77,7 +116,9 @@ func main() {
 	<-stop
 	logger.Info("Shutting down server...")
 
-	persister.SaveSync()
+	if persister != nil {
+		persister.SaveSync()
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
