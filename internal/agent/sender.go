@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/user/practicum-metrics/internal/hash"
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/retry"
 	"github.com/user/practicum-metrics/internal/storage"
@@ -23,9 +24,10 @@ type MetricsSender struct {
 	serverAddress string
 	client        HTTPClient
 	httpClient    *http.Client
+	key           string
 }
 
-func NewMetricsSender(serverAddress string) *MetricsSender {
+func NewMetricsSender(serverAddress string, key string) *MetricsSender {
 	restyClient := resty.New().
 		SetTimeout(defaultTimeout).
 		SetHeader("Content-Type", "text/plain")
@@ -34,6 +36,7 @@ func NewMetricsSender(serverAddress string) *MetricsSender {
 		serverAddress: serverAddress,
 		client:        NewRestyClientAdapter(restyClient),
 		httpClient:    &http.Client{Timeout: defaultTimeout},
+		key:           key,
 	}
 }
 
@@ -42,6 +45,16 @@ func NewMetricsSenderWithClient(serverAddress string, client HTTPClient) *Metric
 		serverAddress: serverAddress,
 		client:        client,
 		httpClient:    &http.Client{Timeout: defaultTimeout},
+		key:           "",
+	}
+}
+
+func NewMetricsSenderWithClientAndKey(serverAddress string, client HTTPClient, key string) *MetricsSender {
+	return &MetricsSender{
+		serverAddress: serverAddress,
+		client:        client,
+		httpClient:    &http.Client{Timeout: defaultTimeout},
+		key:           key,
 	}
 }
 
@@ -100,6 +113,11 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+
+		if ms.key != "" {
+			hashValue := hash.CalculateHMAC(body, ms.key)
+			req.Header.Set("HashSHA256", hashValue)
+		}
 
 		resp, err := ms.httpClient.Do(req)
 		if err != nil {
@@ -165,6 +183,11 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+
+		if ms.key != "" {
+			hashValue := hash.CalculateHMAC(body, ms.key)
+			req.Header.Set("HashSHA256", hashValue)
+		}
 
 		resp, err := ms.httpClient.Do(req)
 		if err != nil {

@@ -12,6 +12,7 @@ var (
 	flagFileStoragePath string
 	flagRestore         bool
 	flagDatabaseDSN     string
+	flagKey             string
 )
 
 func parseFlags() {
@@ -20,6 +21,7 @@ func parseFlags() {
 	flag.StringVar(&flagFileStoragePath, "f", "/tmp/metrics-db.json", "file storage path")
 	flag.BoolVar(&flagRestore, "r", true, "restore previously saved values on startup")
 	flag.StringVar(&flagDatabaseDSN, "d", "", "database connection string")
+	flag.StringVar(&flagKey, "k", "", "secret key for signing requests")
 	flag.Parse()
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
@@ -27,4 +29,5 @@ func parseFlags() {
 	flagFileStoragePath = config.GetEnvAsString("FILE_STORAGE_PATH", flagFileStoragePath)
 	flagRestore = config.GetEnvAsBool("RESTORE", flagRestore)
 	flagDatabaseDSN = config.GetEnvAsString("DATABASE_DSN", flagDatabaseDSN)
+	flagKey = config.GetEnvAsString("KEY", flagKey)
 }

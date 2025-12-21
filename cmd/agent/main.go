@@ -26,7 +26,7 @@ func main() {
 	serverAddress := "http://" + flagRunAddr
 
 	collector := agent.NewMetricsCollector()
-	sender := agent.NewMetricsSender(serverAddress)
+	sender := agent.NewMetricsSender(serverAddress, flagKey)
 
 	pollTicker := time.NewTicker(pollInterval)
 	defer pollTicker.Stop()

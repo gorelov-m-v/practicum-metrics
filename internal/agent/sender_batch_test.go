@@ -46,7 +46,7 @@ func TestSendMetricsBatch_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 
 	gaugeValue := 123.45
 	counterDelta := int64(10)
@@ -89,7 +89,7 @@ func TestSendMetricsBatch_EmptyBatch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendMetricsBatch([]model.Metrics{})
 
 	if err != nil {
@@ -104,7 +104,7 @@ func TestSendMetricsBatch_NilBatch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendMetricsBatch(nil)
 
 	if err != nil {
@@ -120,7 +120,7 @@ func TestSendMetricsBatch_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 
 	gaugeValue := 123.45
 	metrics := []model.Metrics{
@@ -153,7 +153,7 @@ func TestSendMetricsBatch_WithRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 
 	gaugeValue := 123.45
 	metrics := []model.Metrics{
@@ -197,7 +197,7 @@ func TestSendMetricsBatch_LargeBatch(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 
 	metrics := make([]model.Metrics, 100)
 	for i := 0; i < 100; i++ {
