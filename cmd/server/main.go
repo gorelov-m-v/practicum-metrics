@@ -14,6 +14,7 @@ import (
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
+	"github.com/user/practicum-metrics/internal/repository"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
 	"go.uber.org/zap"
@@ -31,6 +32,9 @@ func main() {
 	var db *database.DB
 	var store storage.Storage
 	var persister *storage.Persister
+	var txManager database.TransactionManager
+	var gaugeRepo repository.GaugeRepository
+	var counterRepo repository.CounterRepository
 
 	// Priority: PostgreSQL -> File -> Memory
 	if flagDatabaseDSN != "" {
@@ -49,6 +53,9 @@ func main() {
 		logger.Info("Database migrations completed")
 
 		store = storage.NewDBStorage(db.GetConn())
+		txManager = database.NewTransactionManager(db.GetConn())
+		gaugeRepo = repository.NewGaugeRepository(db.GetConn())
+		counterRepo = repository.NewCounterRepository(db.GetConn())
 		logger.Info("Using PostgreSQL storage")
 	} else if flagFileStoragePath != "" {
 		// Use file-backed memory storage
@@ -70,7 +77,7 @@ func main() {
 		logger.Info("Using in-memory storage")
 	}
 
-	metricsService := service.NewMetricsService(store)
+	metricsService := service.NewMetricsService(store, txManager, gaugeRepo, counterRepo)
 	h, err := handler.NewMetricHandler(metricsService, persister, db)
 	if err != nil {
 		logger.Fatal("Failed to create handler", zap.Error(err))

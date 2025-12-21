@@ -2,19 +2,28 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
+	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/model"
+	"github.com/user/practicum-metrics/internal/repository"
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
 type MetricsService struct {
-	storage storage.Storage
+	storage     storage.Storage
+	txManager   database.TransactionManager
+	gaugeRepo   repository.GaugeRepository
+	counterRepo repository.CounterRepository
 }
 
-func NewMetricsService(storage storage.Storage) *MetricsService {
+func NewMetricsService(storage storage.Storage, txManager database.TransactionManager, gaugeRepo repository.GaugeRepository, counterRepo repository.CounterRepository) *MetricsService {
 	return &MetricsService{
-		storage: storage,
+		storage:     storage,
+		txManager:   txManager,
+		gaugeRepo:   gaugeRepo,
+		counterRepo: counterRepo,
 	}
 }
 
@@ -61,5 +70,58 @@ func (s *MetricsService) UpdateMetricsBatch(ctx context.Context, metrics []model
 			}
 		}
 	}
-	return s.storage.UpdateMetricsBatch(ctx, metrics)
+
+	// For memory storage (no transaction manager)
+	if s.txManager == nil {
+		for _, metric := range metrics {
+			switch storage.MetricType(metric.MType) {
+			case storage.Gauge:
+				if metric.Value != nil {
+					if err := s.storage.UpdateGauge(ctx, metric.ID, *metric.Value); err != nil {
+						return err
+					}
+				}
+			case storage.Counter:
+				if metric.Delta != nil {
+					if err := s.storage.UpdateCounter(ctx, metric.ID, *metric.Delta); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	// For DB storage - use transaction manager
+	return s.txManager.WithTransaction(ctx, func(tx *sql.Tx) error {
+		gauges := make(map[string]float64)
+		counters := make(map[string]int64)
+
+		for _, metric := range metrics {
+			switch storage.MetricType(metric.MType) {
+			case storage.Gauge:
+				if metric.Value != nil {
+					gauges[metric.ID] = *metric.Value
+				}
+			case storage.Counter:
+				if metric.Delta != nil {
+					counters[metric.ID] += *metric.Delta
+				}
+			}
+		}
+
+		if len(gauges) > 0 {
+			if err := s.gaugeRepo.UpsertBatch(ctx, tx, gauges); err != nil {
+				return fmt.Errorf("failed to upsert gauges: %w", err)
+			}
+		}
+
+		if len(counters) > 0 {
+			if err := s.counterRepo.AddBatch(ctx, tx, counters); err != nil {
+				return fmt.Errorf("failed to add counters: %w", err)
+			}
+		}
+
+		return nil
+	})
 }

@@ -10,7 +10,7 @@ import (
 
 func TestNewMetricsService(t *testing.T) {
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	if service == nil {
 		t.Fatal("NewMetricsService returned nil")
@@ -52,7 +52,7 @@ func TestMetricsService_UpdateGauge(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			store := storage.NewMemStorage()
-			service := NewMetricsService(store)
+			service := NewMetricsService(store, nil, nil, nil)
 
 			err := service.UpdateGauge(ctx, tt.metricName, tt.value)
 
@@ -105,7 +105,7 @@ func TestMetricsService_UpdateCounter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			store := storage.NewMemStorage()
-			service := NewMetricsService(store)
+			service := NewMetricsService(store, nil, nil, nil)
 
 			err := service.UpdateCounter(ctx, tt.metricName, tt.value)
 
@@ -130,7 +130,7 @@ func TestMetricsService_UpdateCounter(t *testing.T) {
 func TestMetricsService_GetGauge(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	service.UpdateGauge(ctx, "test_gauge", 42.5)
 
@@ -172,7 +172,7 @@ func TestMetricsService_GetGauge(t *testing.T) {
 func TestMetricsService_GetCounter(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	service.UpdateCounter(ctx, "test_counter", 100)
 
@@ -214,7 +214,7 @@ func TestMetricsService_GetCounter(t *testing.T) {
 func TestMetricsService_GetAllGauges(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	service.UpdateGauge(ctx, "gauge1", 10.5)
 	service.UpdateGauge(ctx, "gauge2", 20.5)
@@ -244,7 +244,7 @@ func TestMetricsService_GetAllGauges(t *testing.T) {
 func TestMetricsService_GetAllCounters(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	service.UpdateCounter(ctx, "counter1", 10)
 	service.UpdateCounter(ctx, "counter2", 20)
@@ -274,7 +274,7 @@ func TestMetricsService_GetAllCounters(t *testing.T) {
 func TestMetricsService_UpdateCounter_Accumulation(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	service.UpdateCounter(ctx, "accumulator", 10)
 	service.UpdateCounter(ctx, "accumulator", 20)
@@ -294,7 +294,7 @@ func TestMetricsService_UpdateCounter_Accumulation(t *testing.T) {
 func TestMetricsService_UpdateGauge_Overwrite(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	service.UpdateGauge(ctx, "temperature", 20.0)
 	service.UpdateGauge(ctx, "temperature", 25.0)
@@ -323,7 +323,7 @@ func TestNewMetricsServiceWithPersister(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
-			service := NewMetricsService(store)
+			service := NewMetricsService(store, nil, nil, nil)
 
 			if service == nil {
 				t.Fatal("NewMetricsService returned nil")
@@ -344,17 +344,15 @@ func TestMetricsService_SaveIfNeeded_WithSyncPersister(t *testing.T) {
 
 	logger := zap.NewNop()
 	persister := storage.NewPersister(store, tmpFile, 0, logger)
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	err := service.UpdateGauge(ctx, "TestMetric", 123.456)
 	if err != nil {
 		t.Fatalf("UpdateGauge failed: %v", err)
 	}
 
-	// Manually trigger save
 	persister.SaveSync()
 
-	// Load to verify
 	loadedStore := storage.NewMemStorage()
 	loadPersister := storage.NewPersister(loadedStore, tmpFile, 0, logger)
 	if err := loadPersister.Restore(); err != nil {
@@ -372,7 +370,7 @@ func TestMetricsService_SaveIfNeeded_WithSyncPersister(t *testing.T) {
 func TestMetricsService_SaveIfNeeded_WithAsyncPersister(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	err := service.UpdateCounter(ctx, "TestCounter", 42)
 	if err != nil {
@@ -390,7 +388,7 @@ func TestMetricsService_SaveIfNeeded_WithAsyncPersister(t *testing.T) {
 func TestMetricsService_SaveIfNeeded_NoPersister(t *testing.T) {
 	ctx := context.Background()
 	store := storage.NewMemStorage()
-	service := NewMetricsService(store)
+	service := NewMetricsService(store, nil, nil, nil)
 
 	err := service.UpdateGauge(ctx, "TestMetric", 100.0)
 	if err != nil {

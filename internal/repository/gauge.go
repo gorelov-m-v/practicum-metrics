@@ -71,24 +71,22 @@ func (r *gaugeRepository) GetAll(ctx context.Context) (map[string]float64, error
 }
 
 func (r *gaugeRepository) UpsertBatch(ctx context.Context, tx *sql.Tx, gauges map[string]float64) error {
-	return retry.WithRetry(func() error {
-		stmt, err := tx.PrepareContext(ctx, `
-			INSERT INTO gauges (name, value, updated_at)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (name) DO UPDATE
-			SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
-		`)
-		if err != nil {
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO gauges (name, value, updated_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (name) DO UPDATE
+		SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for name, value := range gauges {
+		if _, err := stmt.ExecContext(ctx, name, value, now); err != nil {
 			return err
 		}
-		defer stmt.Close()
-
-		now := time.Now()
-		for name, value := range gauges {
-			if _, err := stmt.ExecContext(ctx, name, value, now); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
+	return nil
 }

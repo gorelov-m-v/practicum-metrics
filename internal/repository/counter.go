@@ -85,24 +85,22 @@ func (r *counterRepository) GetAll(ctx context.Context) (map[string]int64, error
 }
 
 func (r *counterRepository) AddBatch(ctx context.Context, tx *sql.Tx, counters map[string]int64) error {
-	return retry.WithRetry(func() error {
-		stmt, err := tx.PrepareContext(ctx, `
-			INSERT INTO counters (name, value, updated_at)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (name) DO UPDATE
-			SET value = counters.value + EXCLUDED.value, updated_at = EXCLUDED.updated_at
-		`)
-		if err != nil {
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO counters (name, value, updated_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (name) DO UPDATE
+		SET value = counters.value + EXCLUDED.value, updated_at = EXCLUDED.updated_at
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for name, delta := range counters {
+		if _, err := stmt.ExecContext(ctx, name, delta, now); err != nil {
 			return err
 		}
-		defer stmt.Close()
-
-		now := time.Now()
-		for name, delta := range counters {
-			if _, err := stmt.ExecContext(ctx, name, delta, now); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
+	return nil
 }

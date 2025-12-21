@@ -23,7 +23,6 @@ type Storage interface {
 	GetAllCounters(ctx context.Context) map[string]int64
 	SetGauges(ctx context.Context, gauges map[string]float64) error
 	SetCounters(ctx context.Context, counters map[string]int64) error
-	UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error
 }
 
 type MemStorage struct {
