@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 )
 
-// CalculateHMAC вычисляет HMAC SHA256 хеш для данных с использованием ключа
 func CalculateHMAC(data []byte, key string) string {
 	if key == "" {
 		return ""
@@ -16,7 +15,6 @@ func CalculateHMAC(data []byte, key string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// VerifyHMAC проверяет соответствие HMAC хеша данным и ключу
 func VerifyHMAC(data []byte, receivedHash string, key string) bool {
 	if key == "" {
 		return receivedHash == ""

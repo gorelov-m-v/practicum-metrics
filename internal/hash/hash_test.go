@@ -44,7 +44,7 @@ func TestCalculateHMAC(t *testing.T) {
 				if result != "" {
 					t.Errorf("CalculateHMAC() with empty key = %v, want empty string", result)
 				}
-			} else if tt.data != nil && len(tt.data) > 0 {
+			} else if len(tt.data) > 0 {
 				if result == "" {
 					t.Errorf("CalculateHMAC() = empty, want non-empty hash")
 				}
@@ -134,10 +134,8 @@ func TestVerifyHMAC(t *testing.T) {
 }
 
 func TestCalculateHMAC_KnownValue(t *testing.T) {
-	// Тест с известным значением для проверки корректности алгоритма
 	data := []byte("The quick brown fox jumps over the lazy dog")
 	key := "key"
-	// Известный HMAC-SHA256 для этих данных
 	expected := "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
 
 	result := CalculateHMAC(data, key)
