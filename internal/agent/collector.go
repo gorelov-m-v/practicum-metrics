@@ -3,9 +3,11 @@ package agent
 import (
 	"math/rand/v2"
 	"runtime"
+	"sync"
 )
 
 type MetricsCollector struct {
+	mu          sync.RWMutex
 	gauges      map[string]float64
 	pollCount   int64
 	randomValue float64
@@ -20,6 +22,9 @@ func NewMetricsCollector() *MetricsCollector {
 }
 
 func (mc *MetricsCollector) Collect() {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
@@ -56,6 +61,9 @@ func (mc *MetricsCollector) Collect() {
 }
 
 func (mc *MetricsCollector) GetGauges() map[string]float64 {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+
 	result := make(map[string]float64, len(mc.gauges)+1)
 	for k, v := range mc.gauges {
 		result[k] = v
@@ -65,5 +73,7 @@ func (mc *MetricsCollector) GetGauges() map[string]float64 {
 }
 
 func (mc *MetricsCollector) GetPollCount() int64 {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
 	return mc.pollCount
 }
