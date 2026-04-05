@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
 	"time"
 
-	"net"
-
 	"github.com/go-chi/chi/v5"
+
 	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/model"

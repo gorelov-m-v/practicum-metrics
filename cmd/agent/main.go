@@ -8,9 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/user/practicum-metrics/internal/agent"
 	"github.com/user/practicum-metrics/internal/model"
-	"go.uber.org/zap"
 )
 
 func main() {

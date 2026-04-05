@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"go.uber.org/zap"
+
 	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/handler"
@@ -19,7 +21,6 @@ import (
 	"github.com/user/practicum-metrics/internal/repository"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
-	"go.uber.org/zap"
 )
 
 func main() {

@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/practicum-metrics/internal/model"
 	"go.uber.org/zap"
+
+	"github.com/user/practicum-metrics/internal/model"
 )
 
 func TestNewWorkerPool(t *testing.T) {

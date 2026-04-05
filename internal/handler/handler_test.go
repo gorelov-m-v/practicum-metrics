@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"

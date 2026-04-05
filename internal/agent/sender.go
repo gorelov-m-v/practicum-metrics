@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+
 	"github.com/user/practicum-metrics/internal/hash"
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/retry"
