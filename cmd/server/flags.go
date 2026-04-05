@@ -13,6 +13,8 @@ var (
 	flagRestore         bool
 	flagDatabaseDSN     string
 	flagKey             string
+	flagAuditFile       string
+	flagAuditURL        string
 )
 
 func parseFlags() {
@@ -22,6 +24,8 @@ func parseFlags() {
 	flag.BoolVar(&flagRestore, "r", true, "restore previously saved values on startup")
 	flag.StringVar(&flagDatabaseDSN, "d", "", "database connection string")
 	flag.StringVar(&flagKey, "k", "", "secret key for signing requests")
+	flag.StringVar(&flagAuditFile, "audit-file", "", "path to audit log file")
+	flag.StringVar(&flagAuditURL, "audit-url", "", "URL to send audit events to")
 	flag.Parse()
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
@@ -30,4 +34,6 @@ func parseFlags() {
 	flagRestore = config.GetEnvAsBool("RESTORE", flagRestore)
 	flagDatabaseDSN = config.GetEnvAsString("DATABASE_DSN", flagDatabaseDSN)
 	flagKey = config.GetEnvAsString("KEY", flagKey)
+	flagAuditFile = config.GetEnvAsString("AUDIT_FILE", flagAuditFile)
+	flagAuditURL = config.GetEnvAsString("AUDIT_URL", flagAuditURL)
 }

@@ -144,7 +144,7 @@ func TestUpdateMetricsBatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			store := storage.NewMemStorage()
 			metricsService := service.NewMetricsService(store, nil, nil, nil)
-			handler, err := NewMetricHandler(metricsService, nil, nil)
+			handler, err := NewMetricHandler(metricsService, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("NewMetricHandler failed: %v", err)
 			}
@@ -191,7 +191,7 @@ func TestUpdateMetricsBatch(t *testing.T) {
 func TestUpdateMetricsBatch_InvalidJSON(t *testing.T) {
 	store := storage.NewMemStorage()
 	metricsService := service.NewMetricsService(store, nil, nil, nil)
-	handler, err := NewMetricHandler(metricsService, nil, nil)
+	handler, err := NewMetricHandler(metricsService, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NewMetricHandler failed: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestUpdateMetricsBatch_InvalidJSON(t *testing.T) {
 func TestUpdateMetricsBatch_CounterAccumulation(t *testing.T) {
 	store := storage.NewMemStorage()
 	metricsService := service.NewMetricsService(store, nil, nil, nil)
-	handler, err := NewMetricHandler(metricsService, nil, nil)
+	handler, err := NewMetricHandler(metricsService, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NewMetricHandler failed: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestUpdateMetricsBatch_CounterAccumulation(t *testing.T) {
 func TestUpdateMetricsBatch_GaugeOverwrite(t *testing.T) {
 	store := storage.NewMemStorage()
 	metricsService := service.NewMetricsService(store, nil, nil, nil)
-	handler, err := NewMetricHandler(metricsService, nil, nil)
+	handler, err := NewMetricHandler(metricsService, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("NewMetricHandler failed: %v", err)
 	}

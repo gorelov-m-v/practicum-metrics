@@ -11,7 +11,10 @@ import (
 	"strconv"
 	"time"
 
+	"net"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/service"
@@ -22,10 +25,11 @@ import (
 var metricsTemplate string
 
 type MetricHandler struct {
-	service   *service.MetricsService
-	persister *storage.Persister
-	template  *template.Template
-	db        *database.DB
+	service        *service.MetricsService
+	persister      *storage.Persister
+	template       *template.Template
+	db             *database.DB
+	auditPublisher *audit.Publisher
 }
 
 type metricData struct {
@@ -38,18 +42,30 @@ type metricsPageData struct {
 	Metrics []metricData
 }
 
-func NewMetricHandler(s *service.MetricsService, p *storage.Persister, db *database.DB) (*MetricHandler, error) {
+func NewMetricHandler(s *service.MetricsService, p *storage.Persister, db *database.DB, ap *audit.Publisher) (*MetricHandler, error) {
 	tmpl, err := template.New("metrics").Parse(metricsTemplate)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse embedded template: %w", err)
 	}
 
 	return &MetricHandler{
-		service:   s,
-		persister: p,
-		template:  tmpl,
-		db:        db,
+		service:        s,
+		persister:      p,
+		template:       tmpl,
+		db:             db,
+		auditPublisher: ap,
 	}, nil
+}
+
+func (h *MetricHandler) publishAudit(r *http.Request, metricNames []string) {
+	if h.auditPublisher == nil || !h.auditPublisher.HasListeners() {
+		return
+	}
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	h.auditPublisher.Publish(audit.NewEvent(metricNames, ip))
 }
 
 func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +87,7 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		if h.persister != nil && h.persister.IsSyncMode() {
 			h.persister.SaveSync()
 		}
+		h.publishAudit(r, []string{metricName})
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 
@@ -87,6 +104,7 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 		if h.persister != nil && h.persister.IsSyncMode() {
 			h.persister.SaveSync()
 		}
+		h.publishAudit(r, []string{metricName})
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 
@@ -190,6 +208,7 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 		if h.persister != nil && h.persister.IsSyncMode() {
 			h.persister.SaveSync()
 		}
+		h.publishAudit(r, []string{req.ID})
 		value, _ := h.service.GetGauge(r.Context(), req.ID)
 		resp.Value = &value
 
@@ -205,6 +224,7 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 		if h.persister != nil && h.persister.IsSyncMode() {
 			h.persister.SaveSync()
 		}
+		h.publishAudit(r, []string{req.ID})
 		delta, _ := h.service.GetCounter(r.Context(), req.ID)
 		resp.Delta = &delta
 
@@ -305,6 +325,12 @@ func (h *MetricHandler) UpdateMetricsBatch(w http.ResponseWriter, r *http.Reques
 	if h.persister != nil && h.persister.IsSyncMode() {
 		h.persister.SaveSync()
 	}
+
+	names := make([]string, len(metrics))
+	for i, m := range metrics {
+		names[i] = m.ID
+	}
+	h.publishAudit(r, names)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

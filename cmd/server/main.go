@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
@@ -73,7 +74,18 @@ func main() {
 	}
 
 	metricsService := service.NewMetricsService(store, txManager, gaugeRepo, counterRepo)
-	h, err := handler.NewMetricHandler(metricsService, persister, db)
+
+	auditPublisher := audit.NewPublisher()
+	if flagAuditFile != "" {
+		auditPublisher.Subscribe(audit.NewFileListener(flagAuditFile))
+		logger.Info("Audit file listener enabled", zap.String("path", flagAuditFile))
+	}
+	if flagAuditURL != "" {
+		auditPublisher.Subscribe(audit.NewURLListener(flagAuditURL))
+		logger.Info("Audit URL listener enabled", zap.String("url", flagAuditURL))
+	}
+
+	h, err := handler.NewMetricHandler(metricsService, persister, db, auditPublisher)
 	if err != nil {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}
