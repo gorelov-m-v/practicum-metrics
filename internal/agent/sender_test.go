@@ -21,7 +21,7 @@ func TestNewMetricsSender(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sender := NewMetricsSender(tt.serverAddress)
+			sender := NewMetricsSender(tt.serverAddress, "")
 			if sender == nil {
 				t.Fatal("NewMetricsSender returned nil")
 			}
@@ -92,7 +92,7 @@ func TestSendGauge(t *testing.T) {
 			}))
 			defer server.Close()
 
-			sender := NewMetricsSender(server.URL)
+			sender := NewMetricsSender(server.URL, "")
 			err := sender.SendGauge(tt.metricName, tt.metricValue)
 
 			if tt.wantError && err == nil {
@@ -161,7 +161,7 @@ func TestSendCounter(t *testing.T) {
 			}))
 			defer server.Close()
 
-			sender := NewMetricsSender(server.URL)
+			sender := NewMetricsSender(server.URL, "")
 			err := sender.SendCounter(tt.metricName, tt.metricValue)
 
 			if tt.wantError && err == nil {
@@ -261,7 +261,7 @@ func TestSendGaugeJSON(t *testing.T) {
 			}))
 			defer server.Close()
 
-			sender := NewMetricsSender(server.URL)
+			sender := NewMetricsSender(server.URL, "")
 			err := sender.SendGaugeJSON(tt.metricName, tt.metricValue)
 
 			if tt.wantError && err == nil {
@@ -361,7 +361,7 @@ func TestSendCounterJSON(t *testing.T) {
 			}))
 			defer server.Close()
 
-			sender := NewMetricsSender(server.URL)
+			sender := NewMetricsSender(server.URL, "")
 			err := sender.SendCounterJSON(tt.metricName, tt.metricValue)
 
 			if tt.wantError && err == nil {
@@ -387,7 +387,7 @@ func TestSendGauge_WithRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendGauge("TestMetric", 100.0)
 
 	if err != nil {
@@ -407,7 +407,7 @@ func TestSendGauge_AllRetriesFailed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendGauge("TestMetric", 100.0)
 
 	if err == nil {
@@ -431,7 +431,7 @@ func TestSendCounter_WithRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendCounter("TestCounter", 42)
 
 	if err != nil {
@@ -451,7 +451,7 @@ func TestSendCounter_AllRetriesFailed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendCounter("TestCounter", 42)
 
 	if err == nil {
@@ -475,7 +475,7 @@ func TestSendGaugeJSON_WithRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendGaugeJSON("TestMetric", 123.456)
 
 	if err != nil {
@@ -495,7 +495,7 @@ func TestSendGaugeJSON_AllRetriesFailed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendGaugeJSON("TestMetric", 123.456)
 
 	if err == nil {
@@ -519,7 +519,7 @@ func TestSendCounterJSON_WithRetries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendCounterJSON("TestCounter", 999)
 
 	if err != nil {
@@ -539,7 +539,7 @@ func TestSendCounterJSON_AllRetriesFailed(t *testing.T) {
 	}))
 	defer server.Close()
 
-	sender := NewMetricsSender(server.URL)
+	sender := NewMetricsSender(server.URL, "")
 	err := sender.SendCounterJSON("TestCounter", 999)
 
 	if err == nil {

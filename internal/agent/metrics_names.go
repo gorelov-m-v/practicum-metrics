@@ -31,4 +31,8 @@ const (
 
 	MetricRandomValue = "RandomValue"
 	MetricPollCount   = "PollCount"
+
+	MetricTotalMemory     = "TotalMemory"
+	MetricFreeMemory      = "FreeMemory"
+	MetricCPUutilization1 = "CPUutilization"
 )

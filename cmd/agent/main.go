@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -25,55 +26,114 @@ func main() {
 	reportInterval := time.Duration(flagReportInterval) * time.Second
 	serverAddress := "http://" + flagRunAddr
 
-	collector := agent.NewMetricsCollector()
-	sender := agent.NewMetricsSender(serverAddress)
+	runtimeCollector := agent.NewMetricsCollector()
+	gopsutilCollector := agent.NewGopsutilCollector()
+	sender := agent.NewMetricsSender(serverAddress, flagKey)
 
-	pollTicker := time.NewTicker(pollInterval)
-	defer pollTicker.Stop()
-
-	reportTicker := time.NewTicker(reportInterval)
-	defer reportTicker.Stop()
+	workerPool := agent.NewWorkerPool(flagRateLimit, sender, logger)
+	workerPool.Start()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	collector.Collect()
+	var wg sync.WaitGroup
 
-	logger.Info("Agent started, collecting and sending metrics...")
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pollTicker := time.NewTicker(pollInterval)
+		defer pollTicker.Stop()
 
-	for {
-		select {
-		case <-stop:
-			logger.Info("Shutting down agent gracefully...")
-			return
+		runtimeCollector.Collect()
 
-		case <-pollTicker.C:
-			collector.Collect()
-
-		case <-reportTicker.C:
-			gauges := collector.GetGauges()
-			pollCount := collector.GetPollCount()
-
-			var metrics []model.Metrics
-			for name, value := range gauges {
-				v := value
-				metrics = append(metrics, model.Metrics{
-					ID:    name,
-					MType: "gauge",
-					Value: &v,
-				})
-			}
-
-			delta := pollCount
-			metrics = append(metrics, model.Metrics{
-				ID:    agent.MetricPollCount,
-				MType: "counter",
-				Delta: &delta,
-			})
-
-			if err := sender.SendMetricsBatch(metrics); err != nil {
-				logger.Error("Failed to send metrics batch", zap.Error(err))
+		for {
+			select {
+			case <-stop:
+				logger.Info("Runtime collector shutting down...")
+				return
+			case <-pollTicker.C:
+				runtimeCollector.Collect()
 			}
 		}
-	}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pollTicker := time.NewTicker(pollInterval)
+		defer pollTicker.Stop()
+
+		if err := gopsutilCollector.Collect(); err != nil {
+			logger.Error("Failed to collect gopsutil metrics", zap.Error(err))
+		}
+
+		for {
+			select {
+			case <-stop:
+				logger.Info("Gopsutil collector shutting down...")
+				return
+			case <-pollTicker.C:
+				if err := gopsutilCollector.Collect(); err != nil {
+					logger.Error("Failed to collect gopsutil metrics", zap.Error(err))
+				}
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		reportTicker := time.NewTicker(reportInterval)
+		defer reportTicker.Stop()
+
+		for {
+			select {
+			case <-stop:
+				logger.Info("Metrics sender shutting down...")
+				return
+			case <-reportTicker.C:
+				var metrics []model.Metrics
+
+				runtimeGauges := runtimeCollector.GetGauges()
+				for name, value := range runtimeGauges {
+					v := value
+					metrics = append(metrics, model.Metrics{
+						ID:    name,
+						MType: "gauge",
+						Value: &v,
+					})
+				}
+
+				gopsutilGauges := gopsutilCollector.GetGauges()
+				for name, value := range gopsutilGauges {
+					v := value
+					metrics = append(metrics, model.Metrics{
+						ID:    name,
+						MType: "gauge",
+						Value: &v,
+					})
+				}
+
+				pollCount := runtimeCollector.GetPollCount()
+				delta := pollCount
+				metrics = append(metrics, model.Metrics{
+					ID:    agent.MetricPollCount,
+					MType: "counter",
+					Delta: &delta,
+				})
+
+				workerPool.Submit(agent.MetricTask{Metrics: metrics})
+			}
+		}
+	}()
+
+	logger.Info("Agent started with worker pool", zap.Int("workers", flagRateLimit))
+
+	<-stop
+	logger.Info("Shutting down agent gracefully...")
+
+	workerPool.Stop()
+	wg.Wait()
+
+	logger.Info("Agent stopped")
 }

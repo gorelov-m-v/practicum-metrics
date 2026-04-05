@@ -36,9 +36,7 @@ func main() {
 	var gaugeRepo repository.GaugeRepository
 	var counterRepo repository.CounterRepository
 
-	// Priority: PostgreSQL -> File -> Memory
 	if flagDatabaseDSN != "" {
-		// Use PostgreSQL storage
 		db, err = database.NewDB(flagDatabaseDSN)
 		if err != nil {
 			logger.Fatal("Failed to connect to database", zap.Error(err))
@@ -46,7 +44,6 @@ func main() {
 		defer db.Close()
 		logger.Info("Database connection established")
 
-		// Run migrations
 		if err := db.RunMigrations("internal/database/migrations"); err != nil {
 			logger.Fatal("Failed to run migrations", zap.Error(err))
 		}
@@ -58,7 +55,6 @@ func main() {
 		counterRepo = repository.NewCounterRepository(db.GetConn())
 		logger.Info("Using PostgreSQL storage")
 	} else if flagFileStoragePath != "" {
-		// Use file-backed memory storage
 		store = storage.NewMemStorage()
 		persister = storage.NewPersister(store, flagFileStoragePath, flagStoreInterval, logger)
 
@@ -72,7 +68,6 @@ func main() {
 		defer persister.Stop()
 		logger.Info("Using file-backed memory storage", zap.String("path", flagFileStoragePath))
 	} else {
-		// Use in-memory storage only
 		store = storage.NewMemStorage()
 		logger.Info("Using in-memory storage")
 	}
@@ -86,6 +81,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Use(middleware.GzipDecompress)
+	r.Use(middleware.HashVerify(flagKey))
 	r.Use(middleware.GzipCompress)
 	r.Use(middleware.Logging(logger))
 	r.Use(chiMiddleware.StripSlashes)
