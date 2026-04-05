@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -97,6 +98,8 @@ func main() {
 	r.Use(middleware.GzipCompress)
 	r.Use(middleware.Logging(logger))
 	r.Use(chiMiddleware.StripSlashes)
+
+	r.Mount("/debug", http.DefaultServeMux)
 
 	r.Post("/updates", h.UpdateMetricsBatch)
 	r.Post("/update", h.UpdateMetricJSON)

@@ -147,21 +147,24 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	gauges := h.service.GetAllGauges(r.Context())
 	counters := h.service.GetAllCounters(r.Context())
 
-	var metrics []metricData
+	metrics := make([]metricData, 0, len(gauges)+len(counters))
+
+	gaugeType := string(storage.Gauge)
+	counterType := string(storage.Counter)
 
 	for name, value := range gauges {
 		metrics = append(metrics, metricData{
-			Type:  string(storage.Gauge),
+			Type:  gaugeType,
 			Name:  name,
-			Value: fmt.Sprintf("%g", value),
+			Value: strconv.FormatFloat(value, 'g', -1, 64),
 		})
 	}
 
 	for name, value := range counters {
 		metrics = append(metrics, metricData{
-			Type:  string(storage.Counter),
+			Type:  counterType,
 			Name:  name,
-			Value: fmt.Sprintf("%d", value),
+			Value: strconv.FormatInt(value, 10),
 		})
 	}
 

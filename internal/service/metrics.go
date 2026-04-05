@@ -105,7 +105,12 @@ func (s *MetricsService) UpdateMetricsBatch(ctx context.Context, metrics []model
 		}
 	}
 
-	// For memory storage (no transaction manager)
+	// For storage that supports batch updates (e.g. MemStorage)
+	if batcher, ok := s.storage.(storage.BatchUpdater); ok && s.txManager == nil {
+		return batcher.UpdateMetricsBatch(ctx, metrics)
+	}
+
+	// Fallback for storage without batch support and no transaction manager
 	if s.txManager == nil {
 		for _, metric := range metrics {
 			switch storage.MetricType(metric.MType) {

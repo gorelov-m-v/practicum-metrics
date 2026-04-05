@@ -25,6 +25,11 @@ type Storage interface {
 	SetCounters(ctx context.Context, counters map[string]int64) error
 }
 
+// BatchUpdater is an optional interface for storages that support batch updates.
+type BatchUpdater interface {
+	UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error
+}
+
 type MemStorage struct {
 	mu       sync.RWMutex
 	gauges   map[string]float64
