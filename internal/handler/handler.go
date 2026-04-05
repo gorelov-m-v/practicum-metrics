@@ -1,3 +1,4 @@
+// Package handler provides HTTP handlers for the metrics server API.
 package handler
 
 import (
@@ -24,6 +25,7 @@ import (
 //go:embed all:templates/metrics.html
 var metricsTemplate string
 
+// MetricHandler handles HTTP requests for metric operations.
 type MetricHandler struct {
 	service        *service.MetricsService
 	persister      *storage.Persister
@@ -42,6 +44,7 @@ type metricsPageData struct {
 	Metrics []metricData
 }
 
+// NewMetricHandler creates a new MetricHandler with parsed templates.
 func NewMetricHandler(s *service.MetricsService, p *storage.Persister, db *database.DB, ap *audit.Publisher) (*MetricHandler, error) {
 	tmpl, err := template.New("metrics").Parse(metricsTemplate)
 	if err != nil {
@@ -68,6 +71,8 @@ func (h *MetricHandler) publishAudit(r *http.Request, metricNames []string) {
 	h.auditPublisher.Publish(audit.NewEvent(metricNames, ip))
 }
 
+// UpdateMetric handles POST /update/{type}/{name}/{value} requests.
+// It updates a single metric using URL path parameters.
 func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
@@ -113,6 +118,8 @@ func (h *MetricHandler) UpdateMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetMetric handles GET /value/{type}/{name} requests.
+// It returns a single metric value as plain text.
 func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
@@ -143,6 +150,8 @@ func (h *MetricHandler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListMetrics handles GET / requests.
+// It renders an HTML page listing all stored metrics.
 func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	gauges := h.service.GetAllGauges(r.Context())
 	counters := h.service.GetAllCounters(r.Context())
@@ -184,6 +193,8 @@ func (h *MetricHandler) ListMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// UpdateMetricJSON handles POST /update requests with JSON body.
+// It updates a single metric and returns the updated value in JSON.
 func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var req model.Metrics
 
@@ -244,6 +255,8 @@ func (h *MetricHandler) UpdateMetricJSON(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+// GetMetricJSON handles POST /value requests with JSON body.
+// It returns the requested metric value in JSON format.
 func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	var req model.Metrics
 
@@ -288,6 +301,8 @@ func (h *MetricHandler) GetMetricJSON(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// PingDB handles GET /ping requests.
+// It checks database connectivity and returns 200 OK or 500 error.
 func (h *MetricHandler) PingDB(w http.ResponseWriter, r *http.Request) {
 	if h.db == nil {
 		http.Error(w, "Database not configured", http.StatusInternalServerError)
@@ -306,6 +321,8 @@ func (h *MetricHandler) PingDB(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// UpdateMetricsBatch handles POST /updates requests with a JSON array of metrics.
+// It updates multiple metrics in a single batch operation.
 func (h *MetricHandler) UpdateMetricsBatch(w http.ResponseWriter, r *http.Request) {
 	var metrics []model.Metrics
 

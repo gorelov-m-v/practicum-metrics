@@ -1,3 +1,4 @@
+// Package storage provides metric storage implementations.
 package storage
 
 import (
@@ -7,13 +8,17 @@ import (
 	"github.com/user/practicum-metrics/internal/model"
 )
 
+// MetricType represents the type of a metric (gauge or counter).
 type MetricType string
 
 const (
-	Gauge   MetricType = "gauge"
+	// Gauge is a metric type that stores a float64 value that can be set.
+	Gauge MetricType = "gauge"
+	// Counter is a metric type that stores an int64 value that is accumulated.
 	Counter MetricType = "counter"
 )
 
+// Storage defines the interface for metric storage backends.
 type Storage interface {
 	UpdateGauge(ctx context.Context, name string, value float64) error
 	UpdateCounter(ctx context.Context, name string, value int64) error
@@ -30,12 +35,14 @@ type BatchUpdater interface {
 	UpdateMetricsBatch(ctx context.Context, metrics []model.Metrics) error
 }
 
+// MemStorage is a thread-safe in-memory implementation of the Storage interface.
 type MemStorage struct {
 	mu       sync.RWMutex
 	gauges   map[string]float64
 	counters map[string]int64
 }
 
+// NewMemStorage creates a new empty MemStorage.
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		gauges:   make(map[string]float64),

@@ -1,3 +1,4 @@
+// Package hash provides HMAC-SHA256 signing and verification utilities.
 package hash
 
 import (
@@ -6,6 +7,8 @@ import (
 	"encoding/hex"
 )
 
+// CalculateHMAC computes HMAC-SHA256 for data using the given key.
+// Returns empty string if key is empty.
 func CalculateHMAC(data []byte, key string) string {
 	if key == "" {
 		return ""
@@ -15,6 +18,7 @@ func CalculateHMAC(data []byte, key string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// VerifyHMAC checks that receivedHash matches the HMAC-SHA256 of data.
 func VerifyHMAC(data []byte, receivedHash string, key string) bool {
 	if key == "" {
 		return receivedHash == ""
