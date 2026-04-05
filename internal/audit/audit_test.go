@@ -15,7 +15,7 @@ func TestNewEvent(t *testing.T) {
 	names := []string{"Alloc", "Frees"}
 	event := NewEvent(names, "192.168.0.42")
 
-	if event.Ts == 0 {
+	if event.TS == 0 {
 		t.Error("expected non-zero timestamp")
 	}
 	if len(event.Metrics) != 2 {

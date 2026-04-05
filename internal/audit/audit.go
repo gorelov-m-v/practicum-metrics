@@ -7,7 +7,7 @@ import (
 
 // Event represents an audit event.
 type Event struct {
-	Ts        int64    `json:"ts"`
+	TS        int64    `json:"ts"`
 	Metrics   []string `json:"metrics"`
 	IPAddress string   `json:"ip_address"`
 }
@@ -15,7 +15,7 @@ type Event struct {
 // NewEvent creates an audit event from metric names and client IP.
 func NewEvent(metricNames []string, ipAddress string) Event {
 	return Event{
-		Ts:        time.Now().Unix(),
+		TS:        time.Now().Unix(),
 		Metrics:   metricNames,
 		IPAddress: ipAddress,
 	}
