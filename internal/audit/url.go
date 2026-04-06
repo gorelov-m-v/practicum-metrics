@@ -4,23 +4,26 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 // URLListener sends audit events via HTTP POST to a remote server.
 type URLListener struct {
 	url    string
-	client *http.Client
+	client *retryablehttp.Client
 }
 
 // NewURLListener creates a new URLListener for the given URL.
 func NewURLListener(url string) *URLListener {
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = 5 * time.Second
+	client.RetryMax = 3
+	client.Logger = nil
 	return &URLListener{
-		url: url,
-		client: &http.Client{
-			Timeout: 5 * time.Second,
-		},
+		url:    url,
+		client: client,
 	}
 }
 

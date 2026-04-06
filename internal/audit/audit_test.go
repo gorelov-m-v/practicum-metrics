@@ -57,7 +57,11 @@ func TestFileListener(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "audit.log")
 
-	listener := NewFileListener(path)
+	listener, err := NewFileListener(path)
+	if err != nil {
+		t.Fatalf("NewFileListener failed: %v", err)
+	}
+	defer listener.Close()
 	event := NewEvent([]string{"Alloc", "Frees"}, "10.0.0.1")
 
 	if err := listener.OnEvent(event); err != nil {

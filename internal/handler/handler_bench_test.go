@@ -24,11 +24,12 @@ func BenchmarkHandler_UpdateMetricJSON_Gauge(b *testing.B) {
 	metric := model.Metrics{ID: "BenchGauge", MType: "gauge", Value: &val}
 	body, _ := json.Marshal(metric)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
+		b.StopTimer()
 		req := httptest.NewRequest(http.MethodPost, "/update", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
+		b.StartTimer()
 		router.ServeHTTP(w, req)
 	}
 }
@@ -43,11 +44,12 @@ func BenchmarkHandler_UpdateMetricJSON_Counter(b *testing.B) {
 	metric := model.Metrics{ID: "BenchCounter", MType: "counter", Delta: &delta}
 	body, _ := json.Marshal(metric)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
+		b.StopTimer()
 		req := httptest.NewRequest(http.MethodPost, "/update", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
+		b.StartTimer()
 		router.ServeHTTP(w, req)
 	}
 }
@@ -62,11 +64,12 @@ func BenchmarkHandler_GetMetricJSON(b *testing.B) {
 	metric := model.Metrics{ID: "BenchGauge", MType: "gauge"}
 	body, _ := json.Marshal(metric)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
+		b.StopTimer()
 		req := httptest.NewRequest(http.MethodPost, "/value", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
+		b.StartTimer()
 		router.ServeHTTP(w, req)
 	}
 }
@@ -96,11 +99,12 @@ func BenchmarkHandler_UpdateMetricsBatch(b *testing.B) {
 	}
 	body, _ := json.Marshal(metrics)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
+		b.StopTimer()
 		req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
+		b.StartTimer()
 		router.ServeHTTP(w, req)
 	}
 }
@@ -115,10 +119,11 @@ func BenchmarkHandler_ListMetrics(b *testing.B) {
 	h, _ := NewMetricHandler(svc, nil, nil, nil)
 	router := setupRouter(h)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
+		b.StopTimer()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
+		b.StartTimer()
 		router.ServeHTTP(w, req)
 	}
 }

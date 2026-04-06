@@ -2,6 +2,7 @@ package audit
 
 import (
 	"encoding/json"
+	"sync"
 	"time"
 )
 
@@ -41,6 +42,7 @@ func (f ListenerFunc) OnEvent(event Event) error {
 
 // Publisher manages audit listeners and notifies them about events.
 type Publisher struct {
+	mu        sync.RWMutex
 	listeners []Listener
 }
 
@@ -49,14 +51,30 @@ func NewPublisher() *Publisher {
 	return &Publisher{}
 }
 
-// Subscribe adds a listener.
+// Subscribe adds a listener. This method is safe for concurrent use.
 func (p *Publisher) Subscribe(l Listener) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.listeners = append(p.listeners, l)
+}
+
+// Unsubscribe removes a listener. This method is safe for concurrent use.
+func (p *Publisher) Unsubscribe(l Listener) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i, listener := range p.listeners {
+		if listener == l {
+			p.listeners = append(p.listeners[:i], p.listeners[i+1:]...)
+			return
+		}
+	}
 }
 
 // Publish notifies all listeners about the event.
 // Errors from individual listeners are logged but do not stop notification of others.
 func (p *Publisher) Publish(event Event) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	for _, l := range p.listeners {
 		_ = l.OnEvent(event)
 	}
@@ -64,5 +82,7 @@ func (p *Publisher) Publish(event Event) {
 
 // HasListeners returns true if there are any registered listeners.
 func (p *Publisher) HasListeners() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 	return len(p.listeners) > 0
 }

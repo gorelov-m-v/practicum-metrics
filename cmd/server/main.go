@@ -79,7 +79,12 @@ func main() {
 
 	auditPublisher := audit.NewPublisher()
 	if flagAuditFile != "" {
-		auditPublisher.Subscribe(audit.NewFileListener(flagAuditFile))
+		fl, err := audit.NewFileListener(flagAuditFile)
+		if err != nil {
+			logger.Fatal("Failed to create audit file listener", zap.Error(err))
+		}
+		defer fl.Close()
+		auditPublisher.Subscribe(fl)
 		logger.Info("Audit file listener enabled", zap.String("path", flagAuditFile))
 	}
 	if flagAuditURL != "" {
