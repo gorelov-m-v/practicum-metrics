@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,13 +12,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"go.uber.org/zap"
+
+	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/repository"
 	"github.com/user/practicum-metrics/internal/service"
 	"github.com/user/practicum-metrics/internal/storage"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -73,7 +76,23 @@ func main() {
 	}
 
 	metricsService := service.NewMetricsService(store, txManager, gaugeRepo, counterRepo)
-	h, err := handler.NewMetricHandler(metricsService, persister, db)
+
+	auditPublisher := audit.NewPublisher()
+	if flagAuditFile != "" {
+		fl, err := audit.NewFileListener(flagAuditFile)
+		if err != nil {
+			logger.Fatal("Failed to create audit file listener", zap.Error(err))
+		}
+		defer fl.Close()
+		auditPublisher.Subscribe(fl)
+		logger.Info("Audit file listener enabled", zap.String("path", flagAuditFile))
+	}
+	if flagAuditURL != "" {
+		auditPublisher.Subscribe(audit.NewURLListener(flagAuditURL))
+		logger.Info("Audit URL listener enabled", zap.String("url", flagAuditURL))
+	}
+
+	h, err := handler.NewMetricHandler(metricsService, persister, db, auditPublisher)
 	if err != nil {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}
@@ -85,6 +104,8 @@ func main() {
 	r.Use(middleware.GzipCompress)
 	r.Use(middleware.Logging(logger))
 	r.Use(chiMiddleware.StripSlashes)
+
+	r.Mount("/debug", http.DefaultServeMux)
 
 	r.Post("/updates", h.UpdateMetricsBatch)
 	r.Post("/update", h.UpdateMetricJSON)

@@ -1,3 +1,4 @@
+// Package service implements business logic for metric operations.
 package service
 
 import (
@@ -12,16 +13,19 @@ import (
 	"github.com/user/practicum-metrics/internal/storage"
 )
 
+// ServiceTimeouts holds timeout configuration for service operations.
 type ServiceTimeouts struct {
 	DefaultOperationTimeout time.Duration
 }
 
+// DefaultServiceTimeouts returns the default timeout configuration.
 func DefaultServiceTimeouts() ServiceTimeouts {
 	return ServiceTimeouts{
 		DefaultOperationTimeout: 5 * time.Second,
 	}
 }
 
+// MetricsService provides business logic for updating and retrieving metrics.
 type MetricsService struct {
 	storage     storage.Storage
 	txManager   database.TransactionManager
@@ -30,6 +34,7 @@ type MetricsService struct {
 	timeouts    ServiceTimeouts
 }
 
+// NewMetricsService creates a new MetricsService with the given dependencies.
 func NewMetricsService(storage storage.Storage, txManager database.TransactionManager, gaugeRepo repository.GaugeRepository, counterRepo repository.CounterRepository) *MetricsService {
 	return &MetricsService{
 		storage:     storage,
@@ -105,7 +110,12 @@ func (s *MetricsService) UpdateMetricsBatch(ctx context.Context, metrics []model
 		}
 	}
 
-	// For memory storage (no transaction manager)
+	// For storage that supports batch updates (e.g. MemStorage)
+	if batcher, ok := s.storage.(storage.BatchUpdater); ok && s.txManager == nil {
+		return batcher.UpdateMetricsBatch(ctx, metrics)
+	}
+
+	// Fallback for storage without batch support and no transaction manager
 	if s.txManager == nil {
 		for _, metric := range metrics {
 			switch storage.MetricType(metric.MType) {

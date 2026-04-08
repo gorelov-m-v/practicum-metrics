@@ -4,8 +4,9 @@ import (
 	"context"
 	"sync"
 
-	"github.com/user/practicum-metrics/internal/model"
 	"go.uber.org/zap"
+
+	"github.com/user/practicum-metrics/internal/model"
 )
 
 type MetricTask struct {

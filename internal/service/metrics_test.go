@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/user/practicum-metrics/internal/storage"
 	"go.uber.org/zap"
+
+	"github.com/user/practicum-metrics/internal/storage"
 )
 
 func TestNewMetricsService(t *testing.T) {

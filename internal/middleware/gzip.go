@@ -47,6 +47,8 @@ func (w *gzipWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// GzipCompress is a middleware that compresses HTTP responses with gzip
+// when the client supports it via Accept-Encoding header.
 func GzipCompress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -68,6 +70,7 @@ func GzipCompress(next http.Handler) http.Handler {
 	})
 }
 
+// GzipDecompress is a middleware that decompresses gzip-encoded request bodies.
 func GzipDecompress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Encoding") != "gzip" {

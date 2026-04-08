@@ -19,6 +19,8 @@ func (w *hashResponseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
+// HashVerify returns a middleware that verifies HMAC-SHA256 signatures
+// on incoming requests and signs outgoing responses using the provided key.
 func HashVerify(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

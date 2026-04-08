@@ -6,8 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/user/practicum-metrics/internal/model"
 	"go.uber.org/zap"
+
+	"github.com/user/practicum-metrics/internal/model"
 )
 
 type Persister struct {
