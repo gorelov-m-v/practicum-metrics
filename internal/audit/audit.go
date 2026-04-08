@@ -1,3 +1,4 @@
+// Package audit provides a publish-subscribe event system for audit logging.
 package audit
 
 import (

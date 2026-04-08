@@ -1,3 +1,4 @@
+// Package retry provides retry logic with exponential backoff for transient failures.
 package retry
 
 import (

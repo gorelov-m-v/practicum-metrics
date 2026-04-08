@@ -1,3 +1,4 @@
+// Package agent implements metrics collection and sending for the monitoring agent.
 package agent
 
 import "github.com/go-resty/resty/v2"
