@@ -6,6 +6,9 @@ import (
 	"sync"
 )
 
+// MetricsCollector collects runtime metrics from the Go runtime.
+//
+// generate:reset
 type MetricsCollector struct {
 	mu          sync.RWMutex
 	gauges      map[string]float64
