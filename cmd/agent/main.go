@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -14,7 +15,26 @@ import (
 	"github.com/user/practicum-metrics/internal/model"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+func printBuildInfo() {
+	na := func(s string) string {
+		if s == "" {
+			return "N/A"
+		}
+		return s
+	}
+	fmt.Printf("Build version: %s\n", na(buildVersion))
+	fmt.Printf("Build date: %s\n", na(buildDate))
+	fmt.Printf("Build commit: %s\n", na(buildCommit))
+}
+
 func main() {
+	printBuildInfo()
 	parseFlags()
 
 	logger, err := zap.NewProduction()
