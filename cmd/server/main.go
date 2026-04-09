@@ -25,21 +25,15 @@ import (
 )
 
 var (
-	buildVersion string
-	buildDate    string
-	buildCommit  string
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
 )
 
 func printBuildInfo() {
-	na := func(s string) string {
-		if s == "" {
-			return "N/A"
-		}
-		return s
-	}
-	fmt.Printf("Build version: %s\n", na(buildVersion))
-	fmt.Printf("Build date: %s\n", na(buildDate))
-	fmt.Printf("Build commit: %s\n", na(buildCommit))
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 }
 
 func main() {
