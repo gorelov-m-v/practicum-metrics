@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,6 +18,8 @@ type Persister struct {
 	storeInterval int
 	stopChan      chan struct{}
 	logger        *zap.Logger
+	stopOnce      sync.Once
+	wg            sync.WaitGroup
 }
 
 func NewPersister(storage Storage, filePath string, storeInterval int, logger *zap.Logger) *Persister {
@@ -31,12 +34,16 @@ func NewPersister(storage Storage, filePath string, storeInterval int, logger *z
 
 func (p *Persister) Start() {
 	if p.storeInterval > 0 {
+		p.wg.Add(1)
 		go p.periodicSave()
 	}
 }
 
 func (p *Persister) Stop() {
-	close(p.stopChan)
+	p.stopOnce.Do(func() {
+		close(p.stopChan)
+	})
+	p.wg.Wait()
 }
 
 func (p *Persister) SaveSync() {
@@ -46,6 +53,8 @@ func (p *Persister) SaveSync() {
 }
 
 func (p *Persister) periodicSave() {
+	defer p.wg.Done()
+
 	ticker := time.NewTicker(time.Duration(p.storeInterval) * time.Second)
 	defer ticker.Stop()
 

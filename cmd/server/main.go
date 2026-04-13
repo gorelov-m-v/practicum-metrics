@@ -83,7 +83,6 @@ func main() {
 		}
 
 		persister.Start()
-		defer persister.Stop()
 		logger.Info("Using file-backed memory storage", zap.String("path", flagFileStoragePath))
 	} else {
 		store = storage.NewMemStorage()
@@ -145,8 +144,8 @@ func main() {
 		Handler: r,
 	}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	go func() {
 		logger.Info("Starting server", zap.String("address", flagRunAddr))
@@ -155,18 +154,19 @@ func main() {
 		}
 	}()
 
-	<-stop
+	<-ctx.Done()
 	logger.Info("Shutting down server...")
 
-	if persister != nil {
-		persister.SaveSync()
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("Server forced to shutdown", zap.Error(err))
+	}
+
+	if persister != nil {
+		persister.Stop()
+		persister.SaveSync()
 	}
 
 	logger.Info("Server stopped gracefully")

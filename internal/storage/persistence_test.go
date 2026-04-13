@@ -228,4 +228,6 @@ func TestPersister_Stop_MultipleTimes(t *testing.T) {
 			t.Error("calling Stop multiple times should not panic")
 		}
 	}()
+
+	persister.Stop()
 }

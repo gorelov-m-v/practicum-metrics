@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/user/practicum-metrics/internal/agent"
 	"github.com/user/practicum-metrics/internal/encryption"
-	"github.com/user/practicum-metrics/internal/model"
 )
 
 var (
@@ -56,8 +56,13 @@ func main() {
 	workerPool := agent.NewWorkerPool(flagRateLimit, sender, logger)
 	workerPool.Start()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
+
+	runtimeCollector.Collect()
+	if err := gopsutilCollector.Collect(); err != nil {
+		logger.Error("Failed to collect gopsutil metrics", zap.Error(err))
+	}
 
 	var wg sync.WaitGroup
 
@@ -67,11 +72,9 @@ func main() {
 		pollTicker := time.NewTicker(pollInterval)
 		defer pollTicker.Stop()
 
-		runtimeCollector.Collect()
-
 		for {
 			select {
-			case <-stop:
+			case <-ctx.Done():
 				logger.Info("Runtime collector shutting down...")
 				return
 			case <-pollTicker.C:
@@ -86,13 +89,9 @@ func main() {
 		pollTicker := time.NewTicker(pollInterval)
 		defer pollTicker.Stop()
 
-		if err := gopsutilCollector.Collect(); err != nil {
-			logger.Error("Failed to collect gopsutil metrics", zap.Error(err))
-		}
-
 		for {
 			select {
-			case <-stop:
+			case <-ctx.Done():
 				logger.Info("Gopsutil collector shutting down...")
 				return
 			case <-pollTicker.C:
@@ -111,40 +110,15 @@ func main() {
 
 		for {
 			select {
-			case <-stop:
+			case <-ctx.Done():
 				logger.Info("Metrics sender shutting down...")
 				return
 			case <-reportTicker.C:
-				var metrics []model.Metrics
-
-				runtimeGauges := runtimeCollector.GetGauges()
-				for name, value := range runtimeGauges {
-					v := value
-					metrics = append(metrics, model.Metrics{
-						ID:    name,
-						MType: "gauge",
-						Value: &v,
-					})
-				}
-
-				gopsutilGauges := gopsutilCollector.GetGauges()
-				for name, value := range gopsutilGauges {
-					v := value
-					metrics = append(metrics, model.Metrics{
-						ID:    name,
-						MType: "gauge",
-						Value: &v,
-					})
-				}
-
-				pollCount := runtimeCollector.GetPollCount()
-				delta := pollCount
-				metrics = append(metrics, model.Metrics{
-					ID:    agent.MetricPollCount,
-					MType: "counter",
-					Delta: &delta,
-				})
-
+				metrics := agent.BuildMetrics(
+					runtimeCollector.GetGauges(),
+					gopsutilCollector.GetGauges(),
+					runtimeCollector.GetPollCount(),
+				)
 				workerPool.Submit(agent.MetricTask{Metrics: metrics})
 			}
 		}
@@ -152,11 +126,19 @@ func main() {
 
 	logger.Info("Agent started with worker pool", zap.Int("workers", flagRateLimit))
 
-	<-stop
+	<-ctx.Done()
 	logger.Info("Shutting down agent gracefully...")
+	stop()
 
-	workerPool.Stop()
 	wg.Wait()
+
+	finalMetrics := agent.BuildMetrics(
+		runtimeCollector.GetGauges(),
+		gopsutilCollector.GetGauges(),
+		runtimeCollector.GetPollCount(),
+	)
+	workerPool.Submit(agent.MetricTask{Metrics: finalMetrics})
+	workerPool.Stop()
 
 	logger.Info("Agent stopped")
 }
