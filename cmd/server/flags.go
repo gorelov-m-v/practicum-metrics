@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"log"
 
 	"github.com/user/practicum-metrics/internal/config"
 )
@@ -16,6 +17,7 @@ var (
 	flagAuditFile       string
 	flagAuditURL        string
 	flagCryptoKey       string
+	flagConfigPath      string
 )
 
 func parseFlags() {
@@ -28,11 +30,55 @@ func parseFlags() {
 	flag.StringVar(&flagAuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&flagAuditURL, "audit-url", "", "URL to send audit events to")
 	flag.StringVar(&flagCryptoKey, "crypto-key", "", "path to private key for request decryption")
+	flag.StringVar(&flagConfigPath, "c", "", "path to JSON config file")
+	flag.StringVar(&flagConfigPath, "config", "", "path to JSON config file")
 	flag.Parse()
+
+	visitedFlags := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) {
+		visitedFlags[f.Name] = true
+	})
+
+	configPath := config.GetEnvAsString("CONFIG", flagConfigPath)
+	if configPath != "" {
+		fileConfig, err := config.LoadServerFileConfig(configPath)
+		if err != nil {
+			log.Fatalf("failed to load config file: %v", err)
+		}
+
+		if !visitedFlags["a"] && fileConfig.Address != nil {
+			flagRunAddr = *fileConfig.Address
+		}
+		if !visitedFlags["i"] && fileConfig.StoreInterval != nil {
+			flagStoreInterval = *fileConfig.StoreInterval
+		}
+		if !visitedFlags["f"] && fileConfig.StoreFile != nil {
+			flagFileStoragePath = *fileConfig.StoreFile
+		}
+		if !visitedFlags["r"] && fileConfig.Restore != nil {
+			flagRestore = *fileConfig.Restore
+		}
+		if !visitedFlags["d"] && fileConfig.DatabaseDSN != nil {
+			flagDatabaseDSN = *fileConfig.DatabaseDSN
+		}
+		if !visitedFlags["k"] && fileConfig.Key != nil {
+			flagKey = *fileConfig.Key
+		}
+		if !visitedFlags["audit-file"] && fileConfig.AuditFile != nil {
+			flagAuditFile = *fileConfig.AuditFile
+		}
+		if !visitedFlags["audit-url"] && fileConfig.AuditURL != nil {
+			flagAuditURL = *fileConfig.AuditURL
+		}
+		if !visitedFlags["crypto-key"] && fileConfig.CryptoKey != nil {
+			flagCryptoKey = *fileConfig.CryptoKey
+		}
+	}
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
 	flagStoreInterval = config.GetEnvAsInt("STORE_INTERVAL", flagStoreInterval)
 	flagFileStoragePath = config.GetEnvAsString("FILE_STORAGE_PATH", flagFileStoragePath)
+	flagFileStoragePath = config.GetEnvAsString("STORE_FILE", flagFileStoragePath)
 	flagRestore = config.GetEnvAsBool("RESTORE", flagRestore)
 	flagDatabaseDSN = config.GetEnvAsString("DATABASE_DSN", flagDatabaseDSN)
 	flagKey = config.GetEnvAsString("KEY", flagKey)
