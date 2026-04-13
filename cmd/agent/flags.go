@@ -12,6 +12,7 @@ var (
 	flagPollInterval   int
 	flagKey            string
 	flagRateLimit      int
+	flagCryptoKey      string
 )
 
 func parseFlags() {
@@ -20,6 +21,7 @@ func parseFlags() {
 	flag.IntVar(&flagPollInterval, "p", 2, "poll interval in seconds")
 	flag.StringVar(&flagKey, "k", "", "secret key for signing requests")
 	flag.IntVar(&flagRateLimit, "l", 3, "maximum number of concurrent outgoing requests")
+	flag.StringVar(&flagCryptoKey, "crypto-key", "", "path to public key for request encryption")
 	flag.Parse()
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
@@ -27,4 +29,5 @@ func parseFlags() {
 	flagPollInterval = config.GetEnvAsInt("POLL_INTERVAL", flagPollInterval)
 	flagKey = config.GetEnvAsString("KEY", flagKey)
 	flagRateLimit = config.GetEnvAsInt("RATE_LIMIT", flagRateLimit)
+	flagCryptoKey = config.GetEnvAsString("CRYPTO_KEY", flagCryptoKey)
 }

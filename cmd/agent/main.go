@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/user/practicum-metrics/internal/agent"
+	"github.com/user/practicum-metrics/internal/encryption"
 	"github.com/user/practicum-metrics/internal/model"
 )
 
@@ -44,6 +45,13 @@ func main() {
 	runtimeCollector := agent.NewMetricsCollector()
 	gopsutilCollector := agent.NewGopsutilCollector()
 	sender := agent.NewMetricsSender(serverAddress, flagKey)
+	if flagCryptoKey != "" {
+		publicKey, err := encryption.LoadPublicKey(flagCryptoKey)
+		if err != nil {
+			logger.Fatal("Failed to load public key", zap.Error(err))
+		}
+		sender.SetPublicKey(publicKey)
+	}
 
 	workerPool := agent.NewWorkerPool(flagRateLimit, sender, logger)
 	workerPool.Start()

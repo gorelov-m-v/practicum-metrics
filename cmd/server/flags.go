@@ -15,6 +15,7 @@ var (
 	flagKey             string
 	flagAuditFile       string
 	flagAuditURL        string
+	flagCryptoKey       string
 )
 
 func parseFlags() {
@@ -26,6 +27,7 @@ func parseFlags() {
 	flag.StringVar(&flagKey, "k", "", "secret key for signing requests")
 	flag.StringVar(&flagAuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&flagAuditURL, "audit-url", "", "URL to send audit events to")
+	flag.StringVar(&flagCryptoKey, "crypto-key", "", "path to private key for request decryption")
 	flag.Parse()
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
@@ -36,4 +38,5 @@ func parseFlags() {
 	flagKey = config.GetEnvAsString("KEY", flagKey)
 	flagAuditFile = config.GetEnvAsString("AUDIT_FILE", flagAuditFile)
 	flagAuditURL = config.GetEnvAsString("AUDIT_URL", flagAuditURL)
+	flagCryptoKey = config.GetEnvAsString("CRYPTO_KEY", flagCryptoKey)
 }

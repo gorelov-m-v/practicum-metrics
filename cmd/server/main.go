@@ -17,6 +17,7 @@ import (
 
 	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
+	"github.com/user/practicum-metrics/internal/encryption"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/repository"
@@ -111,8 +112,18 @@ func main() {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}
 
+	decryptMiddleware := middleware.CryptoDecrypt(nil)
+	if flagCryptoKey != "" {
+		privateKey, err := encryption.LoadPrivateKey(flagCryptoKey)
+		if err != nil {
+			logger.Fatal("Failed to load private key", zap.Error(err))
+		}
+		decryptMiddleware = middleware.CryptoDecrypt(privateKey)
+	}
+
 	r := chi.NewRouter()
 
+	r.Use(decryptMiddleware)
 	r.Use(middleware.GzipDecompress)
 	r.Use(middleware.HashVerify(flagKey))
 	r.Use(middleware.GzipCompress)
