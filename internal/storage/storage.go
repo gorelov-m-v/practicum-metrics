@@ -36,6 +36,8 @@ type BatchUpdater interface {
 }
 
 // MemStorage is a thread-safe in-memory implementation of the Storage interface.
+//
+// generate:reset
 type MemStorage struct {
 	mu       sync.RWMutex
 	gauges   map[string]float64

@@ -2,6 +2,8 @@
 package model
 
 // Metrics represents a single metric value sent between agent and server.
+//
+// generate:reset
 type Metrics struct {
 	ID    string   `json:"id"`
 	MType string   `json:"type"`

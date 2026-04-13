@@ -1,3 +1,4 @@
+// Package repository implements data access layer for PostgreSQL storage of metrics.
 package repository
 
 import (

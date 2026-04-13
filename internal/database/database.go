@@ -1,3 +1,4 @@
+// Package database manages PostgreSQL connections and schema migrations.
 package database
 
 import (

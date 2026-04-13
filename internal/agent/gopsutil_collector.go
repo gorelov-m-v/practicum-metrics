@@ -8,6 +8,9 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
+// GopsutilCollector collects system metrics using gopsutil.
+//
+// generate:reset
 type GopsutilCollector struct {
 	mu     sync.RWMutex
 	gauges map[string]float64
