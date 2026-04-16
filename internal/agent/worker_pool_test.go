@@ -203,6 +203,39 @@ func TestWorkerPool_SubmitAfterStop(t *testing.T) {
 	pool.Submit(MetricTask{Metrics: metrics})
 }
 
+func TestWorkerPool_StopDrainsPendingTasks(t *testing.T) {
+	logger, _ := zap.NewDevelopment()
+
+	var requestCount int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(20 * time.Millisecond)
+		atomic.AddInt32(&requestCount, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL, "")
+	pool := NewWorkerPool(1, sender, logger)
+	pool.Start()
+
+	for i := 0; i < 3; i++ {
+		value := float64(i)
+		pool.Submit(MetricTask{
+			Metrics: []model.Metrics{{
+				ID:    "test_metric",
+				MType: "gauge",
+				Value: &value,
+			}},
+		})
+	}
+
+	pool.Stop()
+
+	if atomic.LoadInt32(&requestCount) != 3 {
+		t.Fatalf("expected 3 requests, got %d", atomic.LoadInt32(&requestCount))
+	}
+}
+
 func TestWorkerPool_ConcurrentSubmit(t *testing.T) {
 	logger, _ := zap.NewDevelopment()
 

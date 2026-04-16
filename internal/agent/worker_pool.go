@@ -21,6 +21,9 @@ type WorkerPool struct {
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancelFunc context.CancelFunc
+	mu         sync.RWMutex
+	stopped    bool
+	stopOnce   sync.Once
 }
 
 func NewWorkerPool(workers int, sender *MetricsSender, logger *zap.Logger) *WorkerPool {
@@ -65,8 +68,16 @@ func (wp *WorkerPool) worker(id int) {
 }
 
 func (wp *WorkerPool) Submit(task MetricTask) {
+	wp.mu.RLock()
+	if wp.stopped {
+		wp.mu.RUnlock()
+		wp.logger.Warn("Cannot submit task, worker pool is shutting down")
+		return
+	}
+
 	select {
 	case <-wp.ctx.Done():
+		wp.mu.RUnlock()
 		wp.logger.Warn("Cannot submit task, worker pool is shutting down")
 		return
 	default:
@@ -74,15 +85,22 @@ func (wp *WorkerPool) Submit(task MetricTask) {
 
 	select {
 	case wp.taskQueue <- task:
+		wp.mu.RUnlock()
 	case <-wp.ctx.Done():
+		wp.mu.RUnlock()
 		wp.logger.Warn("Cannot submit task, worker pool is shutting down")
 	}
 }
 
 func (wp *WorkerPool) Stop() {
-	wp.logger.Info("Stopping worker pool...")
-	close(wp.taskQueue)
-	wp.wg.Wait()
-	wp.cancelFunc()
-	wp.logger.Info("Worker pool stopped")
+	wp.stopOnce.Do(func() {
+		wp.logger.Info("Stopping worker pool...")
+		wp.mu.Lock()
+		wp.stopped = true
+		close(wp.taskQueue)
+		wp.mu.Unlock()
+		wp.wg.Wait()
+		wp.cancelFunc()
+		wp.logger.Info("Worker pool stopped")
+	})
 }

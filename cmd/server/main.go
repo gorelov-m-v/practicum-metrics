@@ -17,6 +17,7 @@ import (
 
 	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
+	"github.com/user/practicum-metrics/internal/encryption"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/repository"
@@ -82,7 +83,6 @@ func main() {
 		}
 
 		persister.Start()
-		defer persister.Stop()
 		logger.Info("Using file-backed memory storage", zap.String("path", flagFileStoragePath))
 	} else {
 		store = storage.NewMemStorage()
@@ -111,8 +111,18 @@ func main() {
 		logger.Fatal("Failed to create handler", zap.Error(err))
 	}
 
+	decryptMiddleware := middleware.CryptoDecrypt(nil)
+	if flagCryptoKey != "" {
+		privateKey, err := encryption.LoadPrivateKey(flagCryptoKey)
+		if err != nil {
+			logger.Fatal("Failed to load private key", zap.Error(err))
+		}
+		decryptMiddleware = middleware.CryptoDecrypt(privateKey)
+	}
+
 	r := chi.NewRouter()
 
+	r.Use(decryptMiddleware)
 	r.Use(middleware.GzipDecompress)
 	r.Use(middleware.HashVerify(flagKey))
 	r.Use(middleware.GzipCompress)
@@ -134,8 +144,8 @@ func main() {
 		Handler: r,
 	}
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	go func() {
 		logger.Info("Starting server", zap.String("address", flagRunAddr))
@@ -144,18 +154,19 @@ func main() {
 		}
 	}()
 
-	<-stop
+	<-ctx.Done()
 	logger.Info("Shutting down server...")
 
-	if persister != nil {
-		persister.SaveSync()
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("Server forced to shutdown", zap.Error(err))
+	}
+
+	if persister != nil {
+		persister.Stop()
+		persister.SaveSync()
 	}
 
 	logger.Info("Server stopped gracefully")

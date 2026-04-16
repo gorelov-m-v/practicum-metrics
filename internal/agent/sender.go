@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 
+	"github.com/user/practicum-metrics/internal/encryption"
 	"github.com/user/practicum-metrics/internal/hash"
 	"github.com/user/practicum-metrics/internal/model"
 	"github.com/user/practicum-metrics/internal/retry"
@@ -26,6 +28,7 @@ type MetricsSender struct {
 	client        HTTPClient
 	httpClient    *http.Client
 	key           string
+	publicKey     *rsa.PublicKey
 }
 
 func NewMetricsSender(serverAddress string, key string) *MetricsSender {
@@ -57,6 +60,32 @@ func NewMetricsSenderWithClientAndKey(serverAddress string, client HTTPClient, k
 		httpClient:    &http.Client{Timeout: defaultTimeout},
 		key:           key,
 	}
+}
+
+func (ms *MetricsSender) SetPublicKey(publicKey *rsa.PublicKey) {
+	ms.publicKey = publicKey
+}
+
+func (ms *MetricsSender) encodeRequestBody(body []byte) ([]byte, bool, error) {
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	if _, err := gzWriter.Write(body); err != nil {
+		return nil, false, fmt.Errorf("failed to compress data: %w", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		return nil, false, fmt.Errorf("failed to close gzip writer: %w", err)
+	}
+
+	if ms.publicKey == nil {
+		return buf.Bytes(), false, nil
+	}
+
+	encryptedBody, err := encryption.Encrypt(buf.Bytes(), ms.publicKey)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to encrypt body: %w", err)
+	}
+
+	return encryptedBody, true, nil
 }
 
 func (ms *MetricsSender) sendMetric(metricType, name, value string) error {
@@ -96,17 +125,13 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write(body); err != nil {
-		return fmt.Errorf("failed to compress data: %w", err)
-	}
-	if err := gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close gzip writer: %w", err)
+	payload, encrypted, err := ms.encodeRequestBody(body)
+	if err != nil {
+		return err
 	}
 
 	return retry.Do(func() error {
-		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(payload))
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
@@ -114,6 +139,9 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+		if encrypted {
+			req.Header.Set(encryption.HeaderEncrypted, encryption.HeaderEncryptedValue)
+		}
 
 		if ms.key != "" {
 			hashValue := hash.CalculateHMAC(body, ms.key)
@@ -166,17 +194,13 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	var buf bytes.Buffer
-	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write(body); err != nil {
-		return fmt.Errorf("failed to compress data: %w", err)
-	}
-	if err := gzWriter.Close(); err != nil {
-		return fmt.Errorf("failed to close gzip writer: %w", err)
+	payload, encrypted, err := ms.encodeRequestBody(body)
+	if err != nil {
+		return err
 	}
 
 	return retry.Do(func() error {
-		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(buf.Bytes()))
+		req, err := http.NewRequest(http.MethodPost, reqURL, bytes.NewBuffer(payload))
 		if err != nil {
 			return fmt.Errorf("failed to create request: %w", err)
 		}
@@ -184,6 +208,9 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+		if encrypted {
+			req.Header.Set(encryption.HeaderEncrypted, encryption.HeaderEncryptedValue)
+		}
 
 		if ms.key != "" {
 			hashValue := hash.CalculateHMAC(body, ms.key)
