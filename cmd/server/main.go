@@ -19,6 +19,7 @@ import (
 	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/encryption"
+	"github.com/user/practicum-metrics/internal/grpcserver"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/repository"
@@ -131,6 +132,27 @@ func main() {
 		logger.Info("Trusted subnet enabled", zap.String("trusted_subnet", flagTrustedSubnet))
 	}
 
+	var metricsGRPCServer interface {
+		Serve(net.Listener) error
+		GracefulStop()
+	}
+	if flagGRPCAddr != "" {
+		listener, err := net.Listen("tcp", flagGRPCAddr)
+		if err != nil {
+			logger.Fatal("Failed to listen gRPC address", zap.String("address", flagGRPCAddr), zap.Error(err))
+		}
+
+		grpcSrv := grpcserver.NewServer(metricsService, persister, trustedSubnet)
+		metricsGRPCServer = grpcSrv
+
+		go func() {
+			logger.Info("Starting gRPC server", zap.String("address", flagGRPCAddr))
+			if err := grpcSrv.Serve(listener); err != nil {
+				logger.Fatal("gRPC server failed", zap.Error(err))
+			}
+		}()
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(decryptMiddleware)
@@ -173,6 +195,10 @@ func main() {
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("Server forced to shutdown", zap.Error(err))
+	}
+
+	if metricsGRPCServer != nil {
+		metricsGRPCServer.GracefulStop()
 	}
 
 	if persister != nil {

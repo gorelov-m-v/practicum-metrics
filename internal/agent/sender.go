@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"google.golang.org/grpc"
 
 	"github.com/user/practicum-metrics/internal/encryption"
 	"github.com/user/practicum-metrics/internal/hash"
 	"github.com/user/practicum-metrics/internal/model"
+	pb "github.com/user/practicum-metrics/internal/proto"
 	"github.com/user/practicum-metrics/internal/retry"
 	"github.com/user/practicum-metrics/internal/storage"
 )
@@ -32,6 +34,8 @@ type MetricsSender struct {
 	key           string
 	publicKey     *rsa.PublicKey
 	realIP        string
+	grpcConn      *grpc.ClientConn
+	grpcClient    pb.MetricsClient
 }
 
 func NewMetricsSender(serverAddress string, key string) *MetricsSender {
@@ -199,6 +203,10 @@ func (ms *MetricsSender) SendCounterJSON(name string, value int64) error {
 func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 	if len(metrics) == 0 {
 		return nil
+	}
+
+	if ms.grpcClient != nil {
+		return ms.sendMetricsBatchGRPC(metrics)
 	}
 
 	reqURL, err := url.JoinPath(ms.serverAddress, "updates")

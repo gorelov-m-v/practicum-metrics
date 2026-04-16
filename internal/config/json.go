@@ -19,6 +19,7 @@ type ServerFileConfig struct {
 	AuditURL      *string
 	CryptoKey     *string
 	TrustedSubnet *string
+	GRPCAddress   *string
 }
 
 type AgentFileConfig struct {
@@ -28,6 +29,7 @@ type AgentFileConfig struct {
 	Key            *string
 	RateLimit      *int
 	CryptoKey      *string
+	GRPCAddress    *string
 }
 
 type serverFileConfigRaw struct {
@@ -41,6 +43,7 @@ type serverFileConfigRaw struct {
 	AuditURL      *string `json:"audit_url"`
 	CryptoKey     *string `json:"crypto_key"`
 	TrustedSubnet *string `json:"trusted_subnet"`
+	GRPCAddress   *string `json:"grpc_address"`
 }
 
 type agentFileConfigRaw struct {
@@ -50,6 +53,7 @@ type agentFileConfigRaw struct {
 	Key            *string `json:"key"`
 	RateLimit      *int    `json:"rate_limit"`
 	CryptoKey      *string `json:"crypto_key"`
+	GRPCAddress    *string `json:"grpc_address"`
 }
 
 func LoadServerFileConfig(path string) (ServerFileConfig, error) {
@@ -68,6 +72,7 @@ func LoadServerFileConfig(path string) (ServerFileConfig, error) {
 		AuditURL:      raw.AuditURL,
 		CryptoKey:     raw.CryptoKey,
 		TrustedSubnet: raw.TrustedSubnet,
+		GRPCAddress:   raw.GRPCAddress,
 	}
 
 	if raw.StoreInterval != nil {
@@ -88,10 +93,11 @@ func LoadAgentFileConfig(path string) (AgentFileConfig, error) {
 	}
 
 	cfg := AgentFileConfig{
-		Address:   raw.Address,
-		Key:       raw.Key,
-		RateLimit: raw.RateLimit,
-		CryptoKey: raw.CryptoKey,
+		Address:     raw.Address,
+		Key:         raw.Key,
+		RateLimit:   raw.RateLimit,
+		CryptoKey:   raw.CryptoKey,
+		GRPCAddress: raw.GRPCAddress,
 	}
 
 	if raw.ReportInterval != nil {

@@ -15,6 +15,7 @@ var (
 	flagRateLimit      int
 	flagCryptoKey      string
 	flagConfigPath     string
+	flagGRPCAddr       string
 )
 
 func parseFlags() {
@@ -24,6 +25,8 @@ func parseFlags() {
 	flag.StringVar(&flagKey, "k", "", "secret key for signing requests")
 	flag.IntVar(&flagRateLimit, "l", 3, "maximum number of concurrent outgoing requests")
 	flag.StringVar(&flagCryptoKey, "crypto-key", "", "path to public key for request encryption")
+	flag.StringVar(&flagGRPCAddr, "g", "", "address and port of gRPC metrics server")
+	flag.StringVar(&flagGRPCAddr, "grpc-address", "", "address and port of gRPC metrics server")
 	flag.StringVar(&flagConfigPath, "c", "", "path to JSON config file")
 	flag.StringVar(&flagConfigPath, "config", "", "path to JSON config file")
 	flag.Parse()
@@ -58,6 +61,9 @@ func parseFlags() {
 		if !visitedFlags["crypto-key"] && fileConfig.CryptoKey != nil {
 			flagCryptoKey = *fileConfig.CryptoKey
 		}
+		if !visitedFlags["g"] && !visitedFlags["grpc-address"] && fileConfig.GRPCAddress != nil {
+			flagGRPCAddr = *fileConfig.GRPCAddress
+		}
 	}
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
@@ -66,4 +72,5 @@ func parseFlags() {
 	flagKey = config.GetEnvAsString("KEY", flagKey)
 	flagRateLimit = config.GetEnvAsInt("RATE_LIMIT", flagRateLimit)
 	flagCryptoKey = config.GetEnvAsString("CRYPTO_KEY", flagCryptoKey)
+	flagGRPCAddr = config.GetEnvAsString("GRPC_ADDRESS", flagGRPCAddr)
 }

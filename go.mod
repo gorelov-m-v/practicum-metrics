@@ -17,13 +17,14 @@ require (
 	github.com/timakin/bodyclose v0.0.0-20260129054331-73d1f95b84b4
 	go.uber.org/zap v1.27.0
 	golang.org/x/tools v0.43.0
+	google.golang.org/grpc v1.74.2
+	google.golang.org/protobuf v1.36.7
 	honnef.co/go/tools v0.7.0
 )
 
 require (
 	github.com/BurntSushi/toml v1.4.1-0.20240526193622-a339e1f7089c // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
 	github.com/gostaticanalysis/comment v1.4.2 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -44,4 +45,5 @@ require (
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
 )

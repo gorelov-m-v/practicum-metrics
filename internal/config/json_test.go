@@ -18,7 +18,8 @@ func TestLoadServerFileConfig(t *testing.T) {
 		"audit_file": "/tmp/audit.log",
 		"audit_url": "http://localhost/audit",
 		"crypto_key": "/tmp/private.pem",
-		"trusted_subnet": "192.168.1.0/24"
+		"trusted_subnet": "192.168.1.0/24",
+		"grpc_address": "localhost:3200"
 	}`)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -68,6 +69,10 @@ func TestLoadServerFileConfig(t *testing.T) {
 	if cfg.TrustedSubnet == nil || *cfg.TrustedSubnet != "192.168.1.0/24" {
 		t.Fatalf("unexpected trusted subnet: %#v", cfg.TrustedSubnet)
 	}
+
+	if cfg.GRPCAddress == nil || *cfg.GRPCAddress != "localhost:3200" {
+		t.Fatalf("unexpected gRPC address: %#v", cfg.GRPCAddress)
+	}
 }
 
 func TestLoadAgentFileConfig(t *testing.T) {
@@ -78,7 +83,8 @@ func TestLoadAgentFileConfig(t *testing.T) {
 		"poll_interval": "3s",
 		"key": "secret",
 		"rate_limit": 7,
-		"crypto_key": "/tmp/public.pem"
+		"crypto_key": "/tmp/public.pem",
+		"grpc_address": "localhost:3200"
 	}`)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -111,6 +117,10 @@ func TestLoadAgentFileConfig(t *testing.T) {
 
 	if cfg.CryptoKey == nil || *cfg.CryptoKey != "/tmp/public.pem" {
 		t.Fatalf("unexpected crypto key: %#v", cfg.CryptoKey)
+	}
+
+	if cfg.GRPCAddress == nil || *cfg.GRPCAddress != "localhost:3200" {
+		t.Fatalf("unexpected gRPC address: %#v", cfg.GRPCAddress)
 	}
 }
 
