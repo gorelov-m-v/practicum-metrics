@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -21,6 +22,7 @@ import (
 
 const (
 	defaultTimeout = 5 * time.Second
+	headerXRealIP  = "X-Real-IP"
 )
 
 type MetricsSender struct {
@@ -29,18 +31,24 @@ type MetricsSender struct {
 	httpClient    *http.Client
 	key           string
 	publicKey     *rsa.PublicKey
+	realIP        string
 }
 
 func NewMetricsSender(serverAddress string, key string) *MetricsSender {
+	realIP := resolveLocalIP(serverAddress)
 	restyClient := resty.New().
 		SetTimeout(defaultTimeout).
 		SetHeader("Content-Type", "text/plain")
+	if realIP != "" {
+		restyClient.SetHeader(headerXRealIP, realIP)
+	}
 
 	return &MetricsSender{
 		serverAddress: serverAddress,
 		client:        NewRestyClientAdapter(restyClient),
 		httpClient:    &http.Client{Timeout: defaultTimeout},
 		key:           key,
+		realIP:        realIP,
 	}
 }
 
@@ -50,6 +58,7 @@ func NewMetricsSenderWithClient(serverAddress string, client HTTPClient) *Metric
 		client:        client,
 		httpClient:    &http.Client{Timeout: defaultTimeout},
 		key:           "",
+		realIP:        resolveLocalIP(serverAddress),
 	}
 }
 
@@ -59,11 +68,18 @@ func NewMetricsSenderWithClientAndKey(serverAddress string, client HTTPClient, k
 		client:        client,
 		httpClient:    &http.Client{Timeout: defaultTimeout},
 		key:           key,
+		realIP:        resolveLocalIP(serverAddress),
 	}
 }
 
 func (ms *MetricsSender) SetPublicKey(publicKey *rsa.PublicKey) {
 	ms.publicKey = publicKey
+}
+
+func (ms *MetricsSender) setRealIPHeader(req *http.Request) {
+	if ms.realIP != "" {
+		req.Header.Set(headerXRealIP, ms.realIP)
+	}
 }
 
 func (ms *MetricsSender) encodeRequestBody(body []byte) ([]byte, bool, error) {
@@ -139,6 +155,7 @@ func (ms *MetricsSender) sendMetricJSON(metric model.Metrics) error {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+		ms.setRealIPHeader(req)
 		if encrypted {
 			req.Header.Set(encryption.HeaderEncrypted, encryption.HeaderEncryptedValue)
 		}
@@ -208,6 +225,7 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+		ms.setRealIPHeader(req)
 		if encrypted {
 			req.Header.Set(encryption.HeaderEncrypted, encryption.HeaderEncryptedValue)
 		}
@@ -228,4 +246,89 @@ func (ms *MetricsSender) SendMetricsBatch(metrics []model.Metrics) error {
 		}
 		return nil
 	})
+}
+
+func resolveLocalIP(serverAddress string) string {
+	if remoteHost(serverAddress) == "localhost" {
+		return net.IPv4(127, 0, 0, 1).String()
+	}
+
+	address, err := remoteHostPort(serverAddress)
+	if err == nil {
+		conn, err := net.Dial("udp", address)
+		if err == nil {
+			defer conn.Close()
+			if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok && addr.IP != nil {
+				return addr.IP.String()
+			}
+		}
+	}
+
+	if ip := firstInterfaceIP(); ip != "" {
+		return ip
+	}
+
+	return net.IPv4(127, 0, 0, 1).String()
+}
+
+func remoteHost(serverAddress string) string {
+	u, err := url.Parse(serverAddress)
+	if err == nil && u.Hostname() != "" {
+		return u.Hostname()
+	}
+
+	host, _, err := net.SplitHostPort(serverAddress)
+	if err != nil {
+		return ""
+	}
+	return host
+}
+
+func remoteHostPort(serverAddress string) (string, error) {
+	u, err := url.Parse(serverAddress)
+	if err == nil && u.Hostname() != "" {
+		port := u.Port()
+		if port == "" {
+			port = "80"
+			if u.Scheme == "https" {
+				port = "443"
+			}
+		}
+		return net.JoinHostPort(u.Hostname(), port), nil
+	}
+
+	host, port, err := net.SplitHostPort(serverAddress)
+	if err != nil {
+		return "", err
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
+func firstInterfaceIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok || ipNet.IP == nil || ipNet.IP.IsLoopback() {
+			continue
+		}
+		if ip := ipNet.IP.To4(); ip != nil {
+			return ip.String()
+		}
+	}
+
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok || ipNet.IP == nil || ipNet.IP.IsLoopback() {
+			continue
+		}
+		if ip := ipNet.IP.To16(); ip != nil {
+			return ip.String()
+		}
+	}
+
+	return ""
 }

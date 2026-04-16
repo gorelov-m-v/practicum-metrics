@@ -24,6 +24,7 @@ func unsetServerEnv() {
 		"AUDIT_FILE",
 		"AUDIT_URL",
 		"CRYPTO_KEY",
+		"TRUSTED_SUBNET",
 		"CONFIG",
 	} {
 		os.Unsetenv(key)
@@ -44,7 +45,8 @@ func TestParseFlags_ConfigFile(t *testing.T) {
 		"key": "file-key",
 		"audit_file": "/tmp/audit.log",
 		"audit_url": "http://localhost/audit",
-		"crypto_key": "/tmp/private.pem"
+		"crypto_key": "/tmp/private.pem",
+		"trusted_subnet": "192.168.1.0/24"
 	}`)
 	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -81,6 +83,9 @@ func TestParseFlags_ConfigFile(t *testing.T) {
 	if flagCryptoKey != "/tmp/private.pem" {
 		t.Fatalf("expected crypto key from config, got %q", flagCryptoKey)
 	}
+	if flagTrustedSubnet != "192.168.1.0/24" {
+		t.Fatalf("expected trusted subnet from config, got %q", flagTrustedSubnet)
+	}
 }
 
 func TestParseFlags_ConfigPriority(t *testing.T) {
@@ -97,7 +102,8 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 		"key": "file-key",
 		"audit_file": "/tmp/audit.log",
 		"audit_url": "http://localhost/audit",
-		"crypto_key": "/tmp/private.pem"
+		"crypto_key": "/tmp/private.pem",
+		"trusted_subnet": "192.168.1.0/24"
 	}`)
 	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -105,9 +111,10 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 
 	os.Setenv("RESTORE", "true")
 	os.Setenv("STORE_FILE", "/tmp/from-env.db")
+	os.Setenv("TRUSTED_SUBNET", "10.0.0.0/8")
 	defer unsetServerEnv()
 
-	os.Args = []string{"cmd", "-c", configPath, "-a", "localhost:9393", "-i", "7", "-d", "postgres://flag/db"}
+	os.Args = []string{"cmd", "-c", configPath, "-a", "localhost:9393", "-i", "7", "-d", "postgres://flag/db", "-t", "172.16.0.0/12"}
 
 	parseFlags()
 
@@ -137,6 +144,9 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 	}
 	if flagCryptoKey != "/tmp/private.pem" {
 		t.Fatalf("expected crypto key from config, got %q", flagCryptoKey)
+	}
+	if flagTrustedSubnet != "10.0.0.0/8" {
+		t.Fatalf("expected trusted subnet from env, got %q", flagTrustedSubnet)
 	}
 }
 

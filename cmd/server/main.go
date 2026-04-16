@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -120,6 +121,16 @@ func main() {
 		decryptMiddleware = middleware.CryptoDecrypt(privateKey)
 	}
 
+	var trustedSubnet *net.IPNet
+	if flagTrustedSubnet != "" {
+		_, ipNet, err := net.ParseCIDR(flagTrustedSubnet)
+		if err != nil {
+			logger.Fatal("Failed to parse trusted subnet", zap.String("trusted_subnet", flagTrustedSubnet), zap.Error(err))
+		}
+		trustedSubnet = ipNet
+		logger.Info("Trusted subnet enabled", zap.String("trusted_subnet", flagTrustedSubnet))
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(decryptMiddleware)
@@ -131,10 +142,10 @@ func main() {
 
 	r.Mount("/debug", http.DefaultServeMux)
 
-	r.Post("/updates", h.UpdateMetricsBatch)
-	r.Post("/update", h.UpdateMetricJSON)
+	r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/updates", h.UpdateMetricsBatch)
+	r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update", h.UpdateMetricJSON)
 	r.Post("/value", h.GetMetricJSON)
-	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
 	r.Get("/ping", h.PingDB)

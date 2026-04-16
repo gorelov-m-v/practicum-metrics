@@ -18,6 +18,7 @@ type ServerFileConfig struct {
 	AuditFile     *string
 	AuditURL      *string
 	CryptoKey     *string
+	TrustedSubnet *string
 }
 
 type AgentFileConfig struct {
@@ -39,6 +40,7 @@ type serverFileConfigRaw struct {
 	AuditFile     *string `json:"audit_file"`
 	AuditURL      *string `json:"audit_url"`
 	CryptoKey     *string `json:"crypto_key"`
+	TrustedSubnet *string `json:"trusted_subnet"`
 }
 
 type agentFileConfigRaw struct {
@@ -57,14 +59,15 @@ func LoadServerFileConfig(path string) (ServerFileConfig, error) {
 	}
 
 	cfg := ServerFileConfig{
-		Address:     raw.Address,
-		Restore:     raw.Restore,
-		StoreFile:   raw.StoreFile,
-		DatabaseDSN: raw.DatabaseDSN,
-		Key:         raw.Key,
-		AuditFile:   raw.AuditFile,
-		AuditURL:    raw.AuditURL,
-		CryptoKey:   raw.CryptoKey,
+		Address:       raw.Address,
+		Restore:       raw.Restore,
+		StoreFile:     raw.StoreFile,
+		DatabaseDSN:   raw.DatabaseDSN,
+		Key:           raw.Key,
+		AuditFile:     raw.AuditFile,
+		AuditURL:      raw.AuditURL,
+		CryptoKey:     raw.CryptoKey,
+		TrustedSubnet: raw.TrustedSubnet,
 	}
 
 	if raw.StoreInterval != nil {

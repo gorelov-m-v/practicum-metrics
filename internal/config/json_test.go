@@ -17,7 +17,8 @@ func TestLoadServerFileConfig(t *testing.T) {
 		"key": "secret",
 		"audit_file": "/tmp/audit.log",
 		"audit_url": "http://localhost/audit",
-		"crypto_key": "/tmp/private.pem"
+		"crypto_key": "/tmp/private.pem",
+		"trusted_subnet": "192.168.1.0/24"
 	}`)
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -62,6 +63,10 @@ func TestLoadServerFileConfig(t *testing.T) {
 
 	if cfg.CryptoKey == nil || *cfg.CryptoKey != "/tmp/private.pem" {
 		t.Fatalf("unexpected crypto key: %#v", cfg.CryptoKey)
+	}
+
+	if cfg.TrustedSubnet == nil || *cfg.TrustedSubnet != "192.168.1.0/24" {
+		t.Fatalf("unexpected trusted subnet: %#v", cfg.TrustedSubnet)
 	}
 }
 
