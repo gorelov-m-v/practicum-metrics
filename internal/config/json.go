@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -112,13 +111,13 @@ func LoadAgentFileConfig(path string) (AgentFileConfig, error) {
 }
 
 func loadJSONFile(path string, target any) error {
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("read config file: %w", err)
+		return fmt.Errorf("open config file: %w", err)
 	}
+	defer file.Close()
 
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
+	dec := json.NewDecoder(file)
 	if err := dec.Decode(target); err != nil {
 		return fmt.Errorf("decode config file: %w", err)
 	}

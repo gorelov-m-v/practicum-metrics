@@ -139,3 +139,20 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 		t.Fatalf("expected crypto key from config, got %q", flagCryptoKey)
 	}
 }
+
+func TestParseFlags_FileStoragePathEnvPriority(t *testing.T) {
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	unsetServerEnv()
+
+	os.Setenv("STORE_FILE", "/tmp/store-file.db")
+	os.Setenv("FILE_STORAGE_PATH", "/tmp/file-storage-path.db")
+	defer unsetServerEnv()
+
+	os.Args = []string{"cmd"}
+
+	parseFlags()
+
+	if flagFileStoragePath != "/tmp/file-storage-path.db" {
+		t.Fatalf("expected FILE_STORAGE_PATH to have priority, got %q", flagFileStoragePath)
+	}
+}

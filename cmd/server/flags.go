@@ -77,8 +77,8 @@ func parseFlags() {
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
 	flagStoreInterval = config.GetEnvAsInt("STORE_INTERVAL", flagStoreInterval)
-	flagFileStoragePath = config.GetEnvAsString("FILE_STORAGE_PATH", flagFileStoragePath)
 	flagFileStoragePath = config.GetEnvAsString("STORE_FILE", flagFileStoragePath)
+	flagFileStoragePath = config.GetEnvAsString("FILE_STORAGE_PATH", flagFileStoragePath)
 	flagRestore = config.GetEnvAsBool("RESTORE", flagRestore)
 	flagDatabaseDSN = config.GetEnvAsString("DATABASE_DSN", flagDatabaseDSN)
 	flagKey = config.GetEnvAsString("KEY", flagKey)

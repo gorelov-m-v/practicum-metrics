@@ -109,6 +109,30 @@ func TestLoadAgentFileConfig(t *testing.T) {
 	}
 }
 
+func TestLoadFileConfig_IgnoresUnknownFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "server.json")
+	data := []byte(`{
+		"address": "localhost:8080",
+		"store_interval": "15s",
+		"unknown_field": "kept for forward compatibility"
+	}`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	cfg, err := LoadServerFileConfig(path)
+	if err != nil {
+		t.Fatalf("load server config: %v", err)
+	}
+
+	if cfg.Address == nil || *cfg.Address != "localhost:8080" {
+		t.Fatalf("unexpected address: %#v", cfg.Address)
+	}
+	if cfg.StoreInterval == nil || *cfg.StoreInterval != 15 {
+		t.Fatalf("unexpected store interval: %#v", cfg.StoreInterval)
+	}
+}
+
 func TestParseIntervalSeconds(t *testing.T) {
 	tests := []struct {
 		name    string
