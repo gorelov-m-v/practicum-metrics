@@ -27,7 +27,12 @@ type MetricsServer struct {
 }
 
 func NewServer(service *service.MetricsService, persister *storage.Persister, trustedSubnet *net.IPNet) *grpc.Server {
-	server := grpc.NewServer(grpc.UnaryInterceptor(TrustedSubnetInterceptor(trustedSubnet)))
+	opts := []grpc.ServerOption{}
+	if trustedSubnet != nil {
+		opts = append(opts, grpc.UnaryInterceptor(TrustedSubnetInterceptor(trustedSubnet)))
+	}
+
+	server := grpc.NewServer(opts...)
 	pb.RegisterMetricsServer(server, NewMetricsServer(service, persister))
 	return server
 }
@@ -74,7 +79,7 @@ func (s *MetricsServer) UpdateMetrics(ctx context.Context, req *pb.UpdateMetrics
 		s.persister.SaveSync()
 	}
 
-	return &pb.UpdateMetricsResponse{}, nil
+	return pb.UpdateMetricsResponse_builder{}.Build(), nil
 }
 
 func TrustedSubnetInterceptor(trustedSubnet *net.IPNet) grpc.UnaryServerInterceptor {

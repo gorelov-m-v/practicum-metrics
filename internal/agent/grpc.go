@@ -42,9 +42,7 @@ func (ms *MetricsSender) Close() error {
 }
 
 func (ms *MetricsSender) sendMetricsBatchGRPC(metrics []model.Metrics) error {
-	req := &pb.UpdateMetricsRequest{
-		Metrics: make([]*pb.Metric, 0, len(metrics)),
-	}
+	protoMetrics := make([]*pb.Metric, 0, len(metrics))
 
 	for _, metric := range metrics {
 		switch storage.MetricType(metric.MType) {
@@ -53,25 +51,29 @@ func (ms *MetricsSender) sendMetricsBatchGRPC(metrics []model.Metrics) error {
 			if metric.Value != nil {
 				value = *metric.Value
 			}
-			req.Metrics = append(req.Metrics, &pb.Metric{
+			protoMetrics = append(protoMetrics, pb.Metric_builder{
 				Id:    metric.ID,
 				Type:  pb.Metric_GAUGE,
 				Value: value,
-			})
+			}.Build())
 		case storage.Counter:
 			delta := int64(0)
 			if metric.Delta != nil {
 				delta = *metric.Delta
 			}
-			req.Metrics = append(req.Metrics, &pb.Metric{
+			protoMetrics = append(protoMetrics, pb.Metric_builder{
 				Id:    metric.ID,
 				Type:  pb.Metric_COUNTER,
 				Delta: delta,
-			})
+			}.Build())
 		default:
 			return fmt.Errorf("unknown metric type: %s", metric.MType)
 		}
 	}
+
+	req := pb.UpdateMetricsRequest_builder{
+		Metrics: protoMetrics,
+	}.Build()
 
 	return retry.Do(func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)

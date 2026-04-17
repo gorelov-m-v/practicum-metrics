@@ -132,6 +132,8 @@ func main() {
 		logger.Info("Trusted subnet enabled", zap.String("trusted_subnet", flagTrustedSubnet))
 	}
 
+	serverErrCh := make(chan error, 2)
+
 	var metricsGRPCServer interface {
 		Serve(net.Listener) error
 		GracefulStop()
@@ -148,7 +150,7 @@ func main() {
 		go func() {
 			logger.Info("Starting gRPC server", zap.String("address", flagGRPCAddr))
 			if err := grpcSrv.Serve(listener); err != nil {
-				logger.Fatal("gRPC server failed", zap.Error(err))
+				serverErrCh <- fmt.Errorf("gRPC server failed: %w", err)
 			}
 		}()
 	}
@@ -164,10 +166,16 @@ func main() {
 
 	r.Mount("/debug", http.DefaultServeMux)
 
-	r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/updates", h.UpdateMetricsBatch)
-	r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update", h.UpdateMetricJSON)
+	if trustedSubnet != nil {
+		r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/updates", h.UpdateMetricsBatch)
+		r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update", h.UpdateMetricJSON)
+		r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	} else {
+		r.Post("/updates", h.UpdateMetricsBatch)
+		r.Post("/update", h.UpdateMetricJSON)
+		r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	}
 	r.Post("/value", h.GetMetricJSON)
-	r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
 	r.Get("/ping", h.PingDB)
@@ -183,11 +191,16 @@ func main() {
 	go func() {
 		logger.Info("Starting server", zap.String("address", flagRunAddr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed", zap.Error(err))
+			serverErrCh <- fmt.Errorf("HTTP server failed: %w", err)
 		}
 	}()
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case err := <-serverErrCh:
+		logger.Error("Server failed", zap.Error(err))
+		stop()
+	}
 	logger.Info("Shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

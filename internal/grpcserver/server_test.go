@@ -19,12 +19,14 @@ func TestMetricsServer_UpdateMetrics(t *testing.T) {
 	metricsService := service.NewMetricsService(store, nil, nil, nil)
 	server := NewMetricsServer(metricsService, nil)
 
-	_, err := server.UpdateMetrics(context.Background(), &pb.UpdateMetricsRequest{
+	req := pb.UpdateMetricsRequest_builder{
 		Metrics: []*pb.Metric{
-			{Id: "temperature", Type: pb.Metric_GAUGE, Value: 42.5},
-			{Id: "requests", Type: pb.Metric_COUNTER, Delta: 3},
+			pb.Metric_builder{Id: "temperature", Type: pb.Metric_GAUGE, Value: 42.5}.Build(),
+			pb.Metric_builder{Id: "requests", Type: pb.Metric_COUNTER, Delta: 3}.Build(),
 		},
-	})
+	}.Build()
+
+	_, err := server.UpdateMetrics(context.Background(), req)
 	if err != nil {
 		t.Fatalf("update metrics: %v", err)
 	}
