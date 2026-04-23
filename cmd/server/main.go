@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"github.com/user/practicum-metrics/internal/audit"
 	"github.com/user/practicum-metrics/internal/database"
 	"github.com/user/practicum-metrics/internal/encryption"
+	"github.com/user/practicum-metrics/internal/grpcserver"
 	"github.com/user/practicum-metrics/internal/handler"
 	"github.com/user/practicum-metrics/internal/middleware"
 	"github.com/user/practicum-metrics/internal/repository"
@@ -120,6 +122,39 @@ func main() {
 		decryptMiddleware = middleware.CryptoDecrypt(privateKey)
 	}
 
+	var trustedSubnet *net.IPNet
+	if flagTrustedSubnet != "" {
+		_, ipNet, err := net.ParseCIDR(flagTrustedSubnet)
+		if err != nil {
+			logger.Fatal("Failed to parse trusted subnet", zap.String("trusted_subnet", flagTrustedSubnet), zap.Error(err))
+		}
+		trustedSubnet = ipNet
+		logger.Info("Trusted subnet enabled", zap.String("trusted_subnet", flagTrustedSubnet))
+	}
+
+	serverErrCh := make(chan error, 2)
+
+	var metricsGRPCServer interface {
+		Serve(net.Listener) error
+		GracefulStop()
+	}
+	if flagGRPCAddr != "" {
+		listener, err := net.Listen("tcp", flagGRPCAddr)
+		if err != nil {
+			logger.Fatal("Failed to listen gRPC address", zap.String("address", flagGRPCAddr), zap.Error(err))
+		}
+
+		grpcSrv := grpcserver.NewServer(metricsService, persister, trustedSubnet)
+		metricsGRPCServer = grpcSrv
+
+		go func() {
+			logger.Info("Starting gRPC server", zap.String("address", flagGRPCAddr))
+			if err := grpcSrv.Serve(listener); err != nil {
+				serverErrCh <- fmt.Errorf("gRPC server failed: %w", err)
+			}
+		}()
+	}
+
 	r := chi.NewRouter()
 
 	r.Use(decryptMiddleware)
@@ -131,10 +166,16 @@ func main() {
 
 	r.Mount("/debug", http.DefaultServeMux)
 
-	r.Post("/updates", h.UpdateMetricsBatch)
-	r.Post("/update", h.UpdateMetricJSON)
+	if trustedSubnet != nil {
+		r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/updates", h.UpdateMetricsBatch)
+		r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update", h.UpdateMetricJSON)
+		r.With(middleware.TrustedSubnet(trustedSubnet)).Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	} else {
+		r.Post("/updates", h.UpdateMetricsBatch)
+		r.Post("/update", h.UpdateMetricJSON)
+		r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
+	}
 	r.Post("/value", h.GetMetricJSON)
-	r.Post("/update/{type}/{name}/{value}", h.UpdateMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Get("/", h.ListMetrics)
 	r.Get("/ping", h.PingDB)
@@ -150,11 +191,16 @@ func main() {
 	go func() {
 		logger.Info("Starting server", zap.String("address", flagRunAddr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed", zap.Error(err))
+			serverErrCh <- fmt.Errorf("HTTP server failed: %w", err)
 		}
 	}()
 
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case err := <-serverErrCh:
+		logger.Error("Server failed", zap.Error(err))
+		stop()
+	}
 	logger.Info("Shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -162,6 +208,10 @@ func main() {
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("Server forced to shutdown", zap.Error(err))
+	}
+
+	if metricsGRPCServer != nil {
+		metricsGRPCServer.GracefulStop()
 	}
 
 	if persister != nil {

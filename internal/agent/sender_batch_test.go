@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,6 +26,9 @@ func TestSendMetricsBatch_Success(t *testing.T) {
 
 		if r.Header.Get("Content-Encoding") != "gzip" {
 			t.Errorf("expected Content-Encoding 'gzip', got '%s'", r.Header.Get("Content-Encoding"))
+		}
+		if ip := net.ParseIP(r.Header.Get(headerXRealIP)); ip == nil {
+			t.Errorf("expected valid %s header, got %q", headerXRealIP, r.Header.Get(headerXRealIP))
 		}
 
 		gzReader, err := gzip.NewReader(r.Body)

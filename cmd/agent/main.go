@@ -45,6 +45,12 @@ func main() {
 	runtimeCollector := agent.NewMetricsCollector()
 	gopsutilCollector := agent.NewGopsutilCollector()
 	sender := agent.NewMetricsSender(serverAddress, flagKey)
+	if flagGRPCAddr != "" {
+		if err := sender.SetGRPCAddress(flagGRPCAddr); err != nil {
+			logger.Fatal("Failed to configure gRPC sender", zap.Error(err))
+		}
+		defer sender.Close()
+	}
 	if flagCryptoKey != "" {
 		publicKey, err := encryption.LoadPublicKey(flagCryptoKey)
 		if err != nil {

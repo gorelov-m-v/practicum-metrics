@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -34,6 +35,23 @@ func TestNewMetricsSender(t *testing.T) {
 				t.Error("resty client not initialized")
 			}
 		})
+	}
+}
+
+func TestSendGauge_SetsXRealIP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := net.ParseIP(r.Header.Get(headerXRealIP))
+		if ip == nil {
+			t.Fatalf("expected valid %s header, got %q", headerXRealIP, r.Header.Get(headerXRealIP))
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	sender := NewMetricsSender(server.URL, "")
+
+	if err := sender.SendGauge("Alloc", 1); err != nil {
+		t.Fatalf("send gauge: %v", err)
 	}
 }
 

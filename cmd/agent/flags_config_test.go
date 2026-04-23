@@ -20,6 +20,7 @@ func unsetAgentEnv() {
 		"KEY",
 		"RATE_LIMIT",
 		"CRYPTO_KEY",
+		"GRPC_ADDRESS",
 		"CONFIG",
 	} {
 		os.Unsetenv(key)
@@ -37,7 +38,8 @@ func TestParseFlags_ConfigFile(t *testing.T) {
 		"poll_interval": "4s",
 		"key": "file-key",
 		"rate_limit": 6,
-		"crypto_key": "/tmp/public.pem"
+		"crypto_key": "/tmp/public.pem",
+		"grpc_address": "localhost:3200"
 	}`)
 	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -65,6 +67,9 @@ func TestParseFlags_ConfigFile(t *testing.T) {
 	if flagCryptoKey != "/tmp/public.pem" {
 		t.Fatalf("expected crypto key from config, got %q", flagCryptoKey)
 	}
+	if flagGRPCAddr != "localhost:3200" {
+		t.Fatalf("expected gRPC address from config, got %q", flagGRPCAddr)
+	}
 }
 
 func TestParseFlags_ConfigPriority(t *testing.T) {
@@ -78,7 +83,8 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 		"poll_interval": "4s",
 		"key": "file-key",
 		"rate_limit": 6,
-		"crypto_key": "/tmp/public.pem"
+		"crypto_key": "/tmp/public.pem",
+		"grpc_address": "localhost:3200"
 	}`)
 	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		t.Fatalf("write config file: %v", err)
@@ -86,9 +92,10 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 
 	os.Setenv("REPORT_INTERVAL", "15")
 	os.Setenv("KEY", "env-key")
+	os.Setenv("GRPC_ADDRESS", "localhost:4200")
 	defer unsetAgentEnv()
 
-	os.Args = []string{"cmd", "-c", configPath, "-a", "localhost:9191", "-l", "8"}
+	os.Args = []string{"cmd", "-c", configPath, "-a", "localhost:9191", "-l", "8", "-g", "localhost:5200"}
 
 	parseFlags()
 
@@ -109,5 +116,8 @@ func TestParseFlags_ConfigPriority(t *testing.T) {
 	}
 	if flagCryptoKey != "/tmp/public.pem" {
 		t.Fatalf("expected crypto key from config, got %q", flagCryptoKey)
+	}
+	if flagGRPCAddr != "localhost:4200" {
+		t.Fatalf("expected gRPC address from env, got %q", flagGRPCAddr)
 	}
 }

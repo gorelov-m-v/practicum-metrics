@@ -18,6 +18,8 @@ var (
 	flagAuditURL        string
 	flagCryptoKey       string
 	flagConfigPath      string
+	flagTrustedSubnet   string
+	flagGRPCAddr        string
 )
 
 func parseFlags() {
@@ -30,6 +32,9 @@ func parseFlags() {
 	flag.StringVar(&flagAuditFile, "audit-file", "", "path to audit log file")
 	flag.StringVar(&flagAuditURL, "audit-url", "", "URL to send audit events to")
 	flag.StringVar(&flagCryptoKey, "crypto-key", "", "path to private key for request decryption")
+	flag.StringVar(&flagTrustedSubnet, "t", "", "trusted subnet in CIDR notation")
+	flag.StringVar(&flagGRPCAddr, "g", "", "address and port to run gRPC server")
+	flag.StringVar(&flagGRPCAddr, "grpc-address", "", "address and port to run gRPC server")
 	flag.StringVar(&flagConfigPath, "c", "", "path to JSON config file")
 	flag.StringVar(&flagConfigPath, "config", "", "path to JSON config file")
 	flag.Parse()
@@ -73,6 +78,12 @@ func parseFlags() {
 		if !visitedFlags["crypto-key"] && fileConfig.CryptoKey != nil {
 			flagCryptoKey = *fileConfig.CryptoKey
 		}
+		if !visitedFlags["t"] && fileConfig.TrustedSubnet != nil {
+			flagTrustedSubnet = *fileConfig.TrustedSubnet
+		}
+		if !visitedFlags["g"] && !visitedFlags["grpc-address"] && fileConfig.GRPCAddress != nil {
+			flagGRPCAddr = *fileConfig.GRPCAddress
+		}
 	}
 
 	flagRunAddr = config.GetEnvAsString("ADDRESS", flagRunAddr)
@@ -85,4 +96,6 @@ func parseFlags() {
 	flagAuditFile = config.GetEnvAsString("AUDIT_FILE", flagAuditFile)
 	flagAuditURL = config.GetEnvAsString("AUDIT_URL", flagAuditURL)
 	flagCryptoKey = config.GetEnvAsString("CRYPTO_KEY", flagCryptoKey)
+	flagTrustedSubnet = config.GetEnvAsString("TRUSTED_SUBNET", flagTrustedSubnet)
+	flagGRPCAddr = config.GetEnvAsString("GRPC_ADDRESS", flagGRPCAddr)
 }
